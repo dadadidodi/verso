@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>中英对照阅读工具</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <h1>中英对照阅读工具</h1>
+    <p>左侧主阅读中文，右侧辅助查看英文。滚动中文时，英文自动定位到对应内容。</p>
+  </header>
+
+  <main class="app-main">
+    <section class="input-panel">
+      <div class="api-panel">
+        <h2>服务端配置</h2>
+        <div class="api-grid">
+          <div class="input-group">
+            <p class="hint-text">AI 配置由服务端 `.env` 读取（`OPENAI_API_KEY / OPENAI_MODEL`）。调试 LLM 时可设 `DUREADING_LLM_DEBUG=1`，完整 prompt 与响应写入 `log/llm_debug.log`（可选 `DUREADING_LLM_DEBUG_FILE` 指定路径）。</p>
+          </div>
+          <div class="input-group checkbox-group">
+            <label>
+              <input id="anchor-mode" type="checkbox">
+              锚点标记模式（仅视觉）
+            </label>
+          </div>
+        </div>
+        <details class="optional-actions">
+          <summary>可选操作（整本重算 / 锚点标记）</summary>
+          <div class="actions-with-help">
+            <div class="action-row">
+              <button id="reapply-btn" type="button">重新整本对齐</button>
+              <span class="action-help">再次请求后端整本 LLM 段落对齐。人工锚点仅用于在页面上标记段落对，不参与此计算。</span>
+            </div>
+            <div class="action-row">
+              <button id="clear-anchors-btn" type="button">清空锚点</button>
+              <span class="action-help">删除所有人工锚点，回到未校准状态。</span>
+            </div>
+          </div>
+        </details>
+        <p id="anchor-hint" class="hint-text">锚点用于在页面上标记段落对，便于对照；不参与 LLM 对齐计算。</p>
+        <ul id="anchor-list" class="anchor-list"></ul>
+      </div>
+
+      <div id="chapter-panel" class="chapter-panel hidden">
+        <h2>章节对应确认（先确认再段落对齐）</h2>
+        <p class="hint-text">系统会先给出章节对应建议。你可以逐项调整，确认无误后再进行段落语义对齐。</p>
+        <div class="actions-with-help">
+          <div class="action-row">
+            <button id="suggest-chapters-btn" type="button">重新生成章节建议</button>
+            <span class="action-help">让 AI 再次给出“中章 -> 英章”建议映射。</span>
+          </div>
+          <div class="action-row file-row">
+            <button id="export-mapping-btn" type="button">导出章节映射</button>
+            <input id="import-mapping-file" type="file" accept=".json,application/json">
+            <button id="import-mapping-btn" type="button">导入章节映射</button>
+            <span class="action-help">保存/读取章节对应关系（不走命令行，可避免重复调用 AI 章节匹配）。</span>
+          </div>
+          <div class="action-row">
+            <button id="apply-chapters-btn" type="button">进入逐章对齐模式</button>
+            <span class="action-help">确认映射后开始逐章流程（不会自动连跳）。</span>
+          </div>
+        </div>
+        <p id="chapter-progress" class="hint-text">当前未进入逐章对齐模式。</p>
+        <details class="optional-actions">
+          <summary>可选操作（导入导出）</summary>
+          <div class="actions-with-help">
+            <div class="action-row file-row">
+              <button id="export-para-mapping-btn" type="button">导出章节段落映射</button>
+              <input id="import-para-mapping-file" type="file" accept=".json,application/json">
+              <button id="import-para-mapping-btn" type="button">导入章节段落映射</button>
+              <span class="action-help">每章中→英段落对应（local_sync_map），含已确认与当前草稿。</span>
+            </div>
+            <div class="action-row">
+              <button id="export-progress-btn" type="button">导出已确认进度</button>
+              <span class="action-help">整本进度（含章节段落结果）。</span>
+            </div>
+            <div class="action-row file-row">
+              <input id="import-progress-file" type="file" accept=".json,application/json">
+              <button id="import-progress-btn" type="button">导入进度</button>
+              <span class="action-help">恢复整本进度。</span>
+            </div>
+          </div>
+        </details>
+        <div id="chapter-list" class="chapter-list"></div>
+        <h3 class="section-title">章内低置信条目（需人工审校）</h3>
+        <div id="paragraph-review-list" class="chapter-list"></div>
+      </div>
+
+      <div class="input-group">
+        <label for="zh-input">中文文本（按空行分段）</label>
+        <input id="zh-epub" type="file" accept=".epub,application/epub+zip">
+        <textarea id="zh-input" placeholder="粘贴中文文本..."></textarea>
+      </div>
+      <div class="input-group">
+        <label for="en-input">英文文本（按空行分段）</label>
+        <input id="en-epub" type="file" accept=".epub,application/epub+zip">
+        <textarea id="en-input" placeholder="Paste English text..."></textarea>
+      </div>
+      <div class="actions">
+        <button id="load-btn" type="button">开始对照阅读</button>
+        <p id="status-text" class="status-text" aria-live="polite"></p>
+        <details class="status-debug" id="status-debug">
+          <summary>当前状态与调试日志</summary>
+          <div class="status-debug-body">
+            <pre id="status-summary" class="status-summary" aria-label="当前应用状态摘要"></pre>
+            <div class="log-toolbar">
+              <button id="clear-log-btn" type="button" class="btn-secondary">清空日志</button>
+              <span class="action-help">下方记录带时间戳的操作与错误，便于对照终端后端日志排查问题。</span>
+            </div>
+            <div id="activity-log" class="activity-log" aria-label="活动日志"></div>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <section class="reader" id="reader" aria-live="polite">
+      <div id="chapter-quick-actions" class="chapter-quick-actions hidden">
+        <div class="quick-meta" id="quick-chapter-meta">未进入逐章模式。</div>
+        <div class="quick-actions-row">
+          <button id="align-current-chapter-btn" type="button">对齐当前章节</button>
+          <span class="action-help">只对当前章发起 AI 段落对齐。</span>
+          <button id="confirm-current-chapter-btn" type="button">确认当前章节</button>
+          <span class="action-help">确认本章结果并写入总映射。</span>
+          <button id="skip-current-chapter-btn" type="button">跳过当前章节</button>
+          <span class="action-help">本章先不细对齐，写入占位映射后可继续下一章。</span>
+          <button id="prev-chapter-btn" type="button">上一章节</button>
+          <span class="action-help">返回上一章查看或复核。</span>
+          <button id="next-chapter-btn" type="button">继续下一章节</button>
+          <span class="action-help">切到下一章（不自动保存；需要时手动导出进度文件）。</span>
+        </div>
+      </div>
+      <article class="column">
+        <h2>中文</h2>
+        <div class="scroll-box" id="zh-scroll"></div>
+      </article>
+      <article class="column">
+        <h2>English</h2>
+        <div class="scroll-box" id="en-scroll"></div>
+      </article>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
