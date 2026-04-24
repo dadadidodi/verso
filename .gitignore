@@ -1,0 +1,7 @@
+.env
+.DS_Store
+log/
+.pycache/
+__pycache__/
+result.txt
+tests/fixtures/*.local.txt
