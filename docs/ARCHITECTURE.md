@@ -164,7 +164,8 @@ DuReading 是一套**中英对照阅读**实验工具：输入两本 EPUB（同�
 
 - `run_web.sh`：启动 `web_server.py`。
 - `paragraph_debug.py` / `chapter_debug.py`：离线跑章节映射与全书对齐，输出文本结果便于 diff。
-- `tests/`：针对 LLM 对齐等可运行 pytest（fixtures 见仓库）；`.gitignore` 可排除本地大文件 fixtures。
+- `tests/`：`tests/test_align_paragraphs_in_chapter_llm.py` 会在配置了 `OPENAI_API_KEY` 时**真实调用**聊天补全接口；需本机可访问 `OPENAI_API_BASE_URL`（无拦截的 HTTP 代理，或正确配置 `NO_PROXY`）。在沙箱、公司代理返回 403、或未设置 Key 时，测试会跳过或失败，属环境而非业务逻辑错误。
+- `.gitignore` 已忽略 `tests/fixtures/*.local.txt` 等本地大文件占位。
 
 ## 11. 已知权衡与限制
 
