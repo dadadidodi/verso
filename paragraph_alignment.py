@@ -150,7 +150,12 @@ def align_paragraphs_in_chapter_llm(
         "TWO blocks ({zh i, en j} and {zh i+1, en j+1}), not a single merged block spanning zh i–i+1 and "
         "en j–j+1. Use one block covering multiple zh indices only when they truly form an N:M or many-to-one "
         "translation unit (e.g. several zh paragraphs render as one en paragraph, or one zh spans several en). "
-        "Never merge adjacent 1:1 pairs for convenience.\n\n"
+        "Never merge adjacent 1:1 pairs for convenience.\n"
+        "8) The Chinese side may contain translator/editor notes or EPUB footnotes accidentally inserted "
+        "as normal paragraphs. These often explain names, books, places, or allusions, and may contain dates "
+        "like （1778—1829）. Do not treat note-only paragraphs as main narrative/dialogue that consumes new "
+        "English paragraphs. If they must be covered, attach them to the nearest relevant English range with "
+        "lower confidence and explain that they are translator notes.\n\n"
         f"{_format_paragraphs_for_prompt('Chinese', zh_paragraphs)}\n\n"
         f"{_format_paragraphs_for_prompt('English', en_paragraphs)}"
     )
@@ -287,6 +292,51 @@ def flatten_map_from_blocks(blocks: Sequence[AlignmentBlock], zh_len: int, en_le
         else:
             last = val
     return mapping
+
+
+def expand_en_ranges_from_blocks(
+    blocks: Sequence[AlignmentBlock],
+    zh_len: int,
+    en_len: int,
+) -> List[Tuple[int, int]]:
+    if zh_len <= 0:
+        return []
+    ranges: List[Tuple[int, int]] = [(0, 0) for _ in range(zh_len)]
+    for block in blocks:
+        zh_span = max(1, block.zh_end - block.zh_start + 1)
+        en_span = max(1, block.en_end - block.en_start + 1)
+        base = max(0, min(en_len - 1, block.en_start - 1))
+        if zh_span == 1:
+            local_ranges = [(0, max(0, en_span - 1))]
+        else:
+            local_ranges = []
+            for i in range(zh_span):
+                start = int((i * en_span) // zh_span)
+                end = int((((i + 1) * en_span) // zh_span) - 1)
+                if end < start:
+                    end = start
+                local_ranges.append((start, end))
+        for i, (start, end) in enumerate(local_ranges):
+            zi = block.zh_start - 1 + i
+            if not 0 <= zi < zh_len:
+                continue
+            en_start = max(0, min(en_len - 1, base + start))
+            en_end = max(en_start, min(en_len - 1, base + end))
+            ranges[zi] = (en_start, en_end)
+    last_start = 0
+    last_end = 0
+    repaired: List[Tuple[int, int]] = []
+    for start, end in ranges:
+        if start < last_start:
+            start = last_start
+        if end < start:
+            end = start
+        if end < last_end and start == last_start:
+            end = last_end
+        repaired.append((start, end))
+        last_start = start
+        last_end = end
+    return repaired
 
 
 def build_review_items(blocks: Sequence[AlignmentBlock], chapter_index: int, threshold: float = 0.55) -> List[Dict[str, object]]:

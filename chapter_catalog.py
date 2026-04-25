@@ -15,6 +15,7 @@ from alignment_common import norm_space
 NS_CONTAINER = {"c": "urn:oasis:names:tc:opendocument:xmlns:container"}
 NS_OPF = {"opf": "http://www.idpf.org/2007/opf"}
 NS_NCX = {"ncx": "http://www.daisy.org/z3986/2005/ncx/"}
+PARSER_VERSION = "footnote_filter_v1"
 
 
 @dataclass
@@ -171,8 +172,37 @@ def extract_heading_fallback(zf: zipfile.ZipFile, path: str) -> str:
     return norm_space(html.unescape(re.sub(r"<[^>]+>", " ", m.group(2))))
 
 
-def extract_paragraphs_from_html_text(html_text: str) -> List[str]:
+def strip_epub_notes(html_text: str) -> str:
+    """Remove EPUB note bodies and inline note references from the reading text."""
+
     cleaned = re.sub(r"<(script|style|noscript|svg|math)[^>]*>.*?</\1>", " ", html_text, flags=re.I | re.S)
+    cleaned = re.sub(
+        r"<aside\b[^>]*(?:epub:type=['\"][^'\"]*footnote|class=['\"][^'\"]*(?:footnote|duokan-footnote)[^'\"]*)[^>]*>.*?</aside>",
+        " ",
+        cleaned,
+        flags=re.I | re.S,
+    )
+    cleaned = re.sub(
+        r"<(section|div)\b[^>]*(?:epub:type=['\"][^'\"]*footnote|class=['\"][^'\"]*(?:footnote|duokan-footnote)[^'\"]*)[^>]*>.*?</\1>",
+        " ",
+        cleaned,
+        flags=re.I | re.S,
+    )
+
+    def strip_note_ref(match: re.Match[str]) -> str:
+        tag = match.group(0)
+        if re.search(r"epub:type=['\"][^'\"]*noteref|zy-footnote=|href=['\"][^'\"]*(?:#footnote|notes?\.xhtml)", tag, re.I):
+            return " "
+        return tag
+
+    cleaned = re.sub(r"<sup\b[^>]*>.*?</sup>", strip_note_ref, cleaned, flags=re.I | re.S)
+    cleaned = re.sub(r"<a\b[^>]*epub:type=['\"][^'\"]*noteref[^>]*>.*?</a>", " ", cleaned, flags=re.I | re.S)
+    cleaned = re.sub(r"<img\b[^>]*(?:zy-footnote=|class=['\"][^'\"]*footnote)[^>]*>", " ", cleaned, flags=re.I | re.S)
+    return cleaned
+
+
+def extract_paragraphs_from_html_text(html_text: str) -> List[str]:
+    cleaned = strip_epub_notes(html_text)
     blocks = re.findall(r"<(p|li|blockquote|h1|h2|h3|h4|h5|h6)[^>]*>(.*?)</\1>", cleaned, flags=re.I | re.S)
     paragraphs: List[str] = []
     for _, inner in blocks:

@@ -1,183 +1,318 @@
-# DuReading 架构与设计说明
+# DuReading V2 Architecture
 
-本文档描述本仓库的**代码逻辑**与**重要工程决策**，便于维护与二次开发。实现细节以源码为准。
+This document describes the current implementation. Source code is the final authority.
 
-## 1. 目标与范围
+## 1. Product Goal
 
-DuReading 是一套**中英对照阅读**实验工具：输入两本 EPUB（同一作品的中、英译本），在**段落粒度**上建立对应关系，供前端并排展示。对齐依赖大语言模型（LLM）的 JSON 输出，而非统计对齐器（如 hunalign）。
+DuReading is a local, reader-first bilingual workspace. It helps a reader use a Chinese translation as the primary reading text and quickly inspect the English source when the translation feels suspicious.
 
-## 2. 模块总览
+The product has two modes:
 
-| 模块 | 文件 | 职责 |
-|------|------|------|
-| EPUB 解析 | `chapter_catalog.py` | 从 EPUB 提取**段落列表**与**章节边界**（每章在段落数组上的 `[start, end]`） |
-| LLM 调用 | `alignment_common.py` | `.env` 加载、`ApiConfig`、OpenAI 兼容 `chat/completions`、JSON 模式、可选调试日志 |
-| 章节映射 | `alignment_service.py` | `map_chapters_ai`：用 LLM 将每个中文章节标题映射到英文章节索引 |
-| 段落对齐 | `paragraph_alignment.py` | 章内 LLM 粗对齐、大块二次细化、块修复、段落级 `sync_map` 展开、低置信度复核项 |
-| 全书编排 | `alignment_service.py` | `align_book_by_chapter_mapping` / `align_single_chapter`：按章切片调用对齐并合并全局索引 |
-| HTTP API | `web_server.py` | 静态页 + `/api/*` JSON 接口，供浏览器 `app.js` 调用 |
-| 前端 | `index.html`, `app.js`, `styles.css` | 上传 EPUB、调 API、展示对齐结果与交互 |
-| 工具脚本 | `epub_to_txt.py`, `epub_to_html.py`, `paragraph_debug.py`, `chapter_debug.py` 等 | 离线导出与调试 |
+- `Read mode`: fast, cached, stable reading. It only serves stored chapter data and does not make AI calls.
+- `Alignment mode`: editing and production mode for chapter mapping, paragraph alignment, anchors, mismatch reports, confirm/skip/regenerate, and background alignment jobs.
 
-## 3. EPUB 解析逻辑（`chapter_catalog.py`）
+The application is local-first. There is no cloud sync, account system, or multi-user collaboration.
 
-### 3.1 读取顺序与 OPF
+## 2. Runtime Stack
 
-- 从 `META-INF/container.xml` 解析 OPF 路径。
-- 读取 OPF 的 `manifest` 与 `spine`，**仅处理** `media-type` 或 `href` 看起来像 HTML/XHTML 的 spine 项。
+| Area | Files | Responsibility |
+| --- | --- | --- |
+| FastAPI app | `web_server.py` | Static app serving plus project/book/alignment APIs |
+| Persistence | `storage_v2.py` | SQLite schema, migrations, artifacts, snapshots |
+| EPUB parsing | `chapter_catalog.py` | Parse EPUB into normalized paragraphs and chapter ranges |
+| LLM utilities | `alignment_common.py` | `.env`, API config, OpenAI-compatible JSON calls, LLM debug log |
+| Chapter/paragraph alignment | `hybrid_alignment.py`, `paragraph_alignment.py`, `alignment_service.py` | Chapter mapping, hybrid alignment, fallback/debug LLM paths |
+| Server events | `server_events.py` | JSONL decision/job/cache logging |
+| Frontend | `index.html`, `app.js`, `frontend_logic.js`, `styles.css` | Library, reader, alignment UI, anchor interaction |
+| Tests | `tests/` | Backend API, alignment regressions, frontend logic |
 
-### 3.2 章节标题来源（优先级）
+`alignment_service.py` and some older utilities remain available for compatibility/debug comparisons, but the main V2 flow is project-based through `web_server.py`, `storage_v2.py`, and `hybrid_alignment.py`.
 
-1. **EPUB3 nav**：`manifest` 中带 `properties` 含 `nav` 的文档，解析其中 `<a href>` 与锚文本，得到 `(内容路径 → 标题)`。
-2. **NCX**：若无 nav，则解析 `application/x-dtbncx+xml` 的 `navPoint`。
-3. **回退**：从该 spine 文件的 HTML 中取首个 `h1|h2|h3|title` 标签内文本。
+## 3. Persistent Data Model
 
-### 3.3 段落如何产生
+SQLite lives under `storage/app.db` by default. `DUREADING_STORAGE_DIR` can point to another storage root.
 
-对每段 spine HTML：
+Main tables:
 
-1. 去掉 `script/style/noscript/svg/math`。
-2. 用正则抽取 `<p|li|blockquote|h1–h6>` 的内文，规范化空白；长度 ≥ 2 的视为一段。
-3. 若一个文件内没有任何匹配，则退化为「剥标签后的全文」再按空行分段。
+- `books`: uploaded EPUB metadata, language, content hash, title, source path.
+- `book_artifacts`: parser artifact paths, stats, parser version.
+- `projects`: one Chinese book paired with one English book.
+- `chapter_mappings`: Chinese chapter index to English chapter index, confidence/source/reason/confirmation.
+- `chapter_alignments`: per-Chinese-chapter state, blocks, sync map, review items, metrics, cache key.
+- `anchors`: hard anchors and mismatch reports. Hard anchors are alignment constraints; mismatch reports are debug feedback.
+- `jobs`: background prefetch/align-remaining jobs.
 
-**决策**：段落边界由**标签结构**主导，而不是 Bitextual 类工具常用的「html-to-text 后按行切」。这样更贴近「一个 `<p>` 一段」的编辑结构，但对排版很乱的 EPUB 会退化为粗粒度块。
+Filesystem layout:
 
-### 3.4 全书数据结构
+- `storage/books/{book_id}/source.epub`
+- `storage/books/{book_id}/paragraphs.json`
+- `storage/books/{book_id}/chapters.json`
+- `storage/projects/{project_id}/...`
 
-- `paragraphs: List[str]`：全书所有段落顺序拼接。
-- `chapters: List[ChapterSegment]`：每项含 `title`, `path`, `start`, `end`（闭区间下标，与代码中切片 `zh_start : zh_end + 1` 一致）。
+Uploaded books are reusable. Projects reference book IDs rather than duplicating EPUB artifacts.
 
-`extract_epub_document_from_bytes` 与 `extract_epub_document` 供 CLI / `web_server` 的 base64 上传使用。
+## 4. EPUB Parsing
 
-## 4. LLM 基础设施（`alignment_common.py`）
+`chapter_catalog.py` parses EPUB spine HTML/XHTML files into:
 
-### 4.1 配置
+- `paragraphs: list[str]`
+- `chapters: list[{title, path, start, end}]`
 
-- `load_env_file()` 读取项目根目录 `.env`（不覆盖已有环境变量）。
-- `get_api_config()`：`OPENAI_API_BASE_URL`（默认官方）、`OPENAI_API_KEY`、`OPENAI_MODEL`（默认 `gpt-4.1`）。
+Chapter titles come from EPUB nav/NCX when available, then fallback heading/title extraction.
 
-### 4.2 请求约定
+Paragraph extraction is structure-first:
 
-- `call_chat_json`：`temperature: 0`，`response_format: json_object`，解析 `choices[0].message.content` 为 JSON **对象**。
-- 超时默认 120s；章内对齐调用使用更长超时（如 600s）。
+1. Remove non-reading elements such as scripts/styles.
+2. Remove footnote-like elements and note references where the EPUB marks them structurally.
+3. Extract text from paragraph/list/blockquote/heading tags.
+4. If no structured paragraphs are found, fallback to stripped text split by blank lines.
 
-### 4.3 调试
+`PARSER_VERSION` is persisted in `book_artifacts`, so stale artifacts can be refreshed when parser behavior changes.
 
-- `DUREADING_LLM_DEBUG=1` 等：将每次调用的 system/user prompt 与响应追加写入 `log/llm_debug.log`（或 `DUREADING_LLM_DEBUG_FILE`）。
+## 5. Public API Shape
 
-**决策**：统一走 OpenAI 兼容接口，便于换兼容供应商；**不**在仓库内实现重试/流式，失败即抛错由上层处理。
+The V2 API is project-based.
 
-## 5. 章节级对齐（`map_chapters_ai`）
+Book APIs:
 
-**输入**：中文书名章节标题列表、英文书名章节标题列表（已由前端/API 做 `norm_space`）。
+- `POST /api/books`
+- `GET /api/books`
+- `GET /api/books/{book_id}`
+- `DELETE /api/books/{book_id}`
+- `GET /api/books/{book_id}/chapters`
 
-**提示词约束要点**：
+Project APIs:
 
-- 输出 JSON：`pairs[{ zh_index, en_index, confidence, reason }]`（模型侧为 **1-based** 章节序号）。
-- 每个中文章节**恰好出现一次**，`zh_index` 覆盖 `1..N`。
-- **英文索引随中文章节非递减**（不允许「后面的中文章」映射到更靠前的英文章），与译本阅读顺序一致。
+- `POST /api/projects`
+- `GET /api/projects`
+- `GET /api/projects/{project_id}`
+- `DELETE /api/projects/{project_id}`
+- `GET /api/projects/{project_id}/chapters`
+- `GET /api/projects/{project_id}/export`
 
-**后处理**：
+Chapter mapping APIs:
 
-- 转为 0-based `ChapterPair`，按 `zh_index` 排序。
-- 若某 `zh_i` 缺失，用**上一已成功映射的 `en_index`** 填充并标记低置信（`missing_from_ai_output_filled`）。
-- 对已有项：`en_i = max(last_en, min(p.en_index, len(en_titles)-1))`，保证单调不减。
+- `POST /api/projects/{project_id}/chapter-mapping/suggest`
+- `GET /api/projects/{project_id}/chapter-mapping`
+- `PUT /api/projects/{project_id}/chapter-mapping`
+- `POST /api/projects/{project_id}/chapter-mapping/confirm`
 
-**决策**：章节映射**完全依赖 LLM**，没有用编辑距离或规则匹配做预筛选；单调性在提示词 + 代码两侧双重约束，减少交叉映射。
+Chapter alignment APIs:
 
-## 6. 章内段落对齐（`paragraph_alignment.py`）
+- `POST /api/projects/{project_id}/chapters/{chapter_index}/align`
+- `POST /api/projects/{project_id}/chapters/{chapter_index}/regenerate`
+- `GET /api/projects/{project_id}/chapters/{chapter_index}/alignment`
+- `POST /api/projects/{project_id}/chapters/{chapter_index}/confirm`
+- `POST /api/projects/{project_id}/chapters/{chapter_index}/skip`
 
-### 6.1 粗对齐 `align_paragraphs_in_chapter_llm`
+Reader APIs:
 
-- 将当前章的中、英段落编号写入 prompt（1-based 展示）。
-- 要求输出 `blocks`，每块为**连续**中文下标范围与**连续**英文下标范围的 N:M 对齐。
-- 规则强调：**语义/翻译等价**，而非长度或位置；中文侧须**划分完整**且无重叠；英文侧块间**单调**（允许边界相接）。
-- 特别强调：**不要**把相邻的多个 1:1 对**合并**成一个大块，以保持最细合理粒度。
+- `GET /api/projects/{project_id}/reader`
+- `GET /api/projects/{project_id}/reader/chapters/{chapter_index}`
 
-### 6.2 块规范化 `_coerce_blocks` / `_repair_monotonic_blocks`
+Anchor/report APIs:
 
-- 解析 JSON 后为每个块裁剪到合法范围，排序。
-- `_repair_monotonic_blocks`：按块顺序推进 `cursor_zh` / `cursor_en`，修正越界与顺序，尾部用 `filled_tail` 低置信块补齐。
+- `GET /api/projects/{project_id}/anchors`
+- `POST /api/projects/{project_id}/anchors`
+- `DELETE /api/projects/{project_id}/anchors/{anchor_id}`
+- `POST /api/projects/{project_id}/mismatch-reports`
 
-**决策**：宁可后处理修复，也不在首轮提示词里追求过完美的边界情况，以降低空返回率。
+Job APIs:
 
-### 6.3 大块细化 `refine_large_blocks_llm`
+- `POST /api/projects/{project_id}/jobs/prefetch`
+- `POST /api/projects/{project_id}/jobs/align-remaining`
+- `GET /api/projects/{project_id}/jobs`
 
-- 若某块中文或英文跨度 **> 8**（默认 `threshold`），视为「大块」。
-- 默认最多对**按跨度排序后的前 2 个大块**（`max_refine_calls`）再调用一次 `align_paragraphs_in_chapter_llm`（子问题：仅该块内的局部段落）。
-- 子块坐标**回写到全书章内 1-based 索引**，`reason` 前缀 `refined:`。
-- 最后再跑 `_repair_monotonic_blocks`。
+## 6. Chapter Mapping
 
-**决策**：两阶段（粗 + 局部细）平衡费用与质量；只细化少量最大块，避免全书级调用爆炸。
+Chapter mapping is generated per project and stored in `chapter_mappings`.
 
-### 6.4 从块到「每中文段一行英文索引」`flatten_map_from_blocks`
+The primary path uses LLM chapter-title mapping because title-only mapping has been more reliable for the bundled Middlemarch pair than earlier heuristic title/position matching. The fallback path remains deterministic if LLM is unavailable.
 
-- 模型给出的是**块**，UI 需要**每个中文段落**对应一个英文段落下标（用于并排滚动或高亮）。
-- 块内使用 `_even_zh_to_en_indices`：在块内将 `zh_span` 个中文行映射到 `en_span` 个英文索引，**尽量均匀分摊**（多中文对少英文时）；少中文多英文时用端点插值。
-- 再对整个 `mapping` 做**非递减修正**（若某格小于前一格则抬升到前一格），与「不回读」的阅读顺序一致。
+Mappings store:
 
-**决策**：块内映射是**启发式**的，不是模型逐段输出；因此 1:N 块内英文行的「哪一行对哪句中文」可能不精确，但全局顺序一致。
+- Chinese chapter index.
+- English chapter index.
+- source (`llm`, `fallback`, `manual`, etc.).
+- confidence/reason/alternatives.
+- confirmation state.
 
-### 6.5 复核列表 `build_review_items`
+Once confirmed, the mapping panel defaults to collapsed. Confirmation does not freeze paragraph alignments; it freezes the chapter pair choices until the user edits them again.
 
-- `score_alignment_confidence` 综合模型 `confidence` 与中英跨度不平衡；对「多中文对单英文」且置信度尚可时略微降低不平衡惩罚。
-- 低于阈值（默认 0.55）的块进入 `review_items`，供前端或人工关注。
+## 7. Chapter Alignment Model
 
-## 7. 全书对齐编排（`alignment_service.py`）
+The canonical alignment truth is block/range based, not a single English point per Chinese paragraph.
 
-### 7.1 `align_book_by_chapter_mapping`
+Stored alignment fields:
 
-对每一中文 `ChapterSegment`：
+- `blocks`: canonical semantic blocks. Each block contains 1-based `zh_start`, `zh_end`, `en_start`, `en_end`, confidence, reason.
+- `en_ranges_by_zh`: derived 0-based English ranges for each Chinese paragraph.
+- `local_sync_map`: derived 0-based English point projection used for scroll sync and compatibility.
+- `review_items`: low-confidence or suspicious spans.
+- `metrics`: explainability and runtime metadata.
 
-1. 用 `chapter_map[c_idx]` 取对应的英文章节索引，切片 `local_zh` / `local_en`。
-2. `align_paragraphs_in_chapter_llm` → `refine_large_blocks_llm`。
-3. `flatten_map_from_blocks` 得到章内 `local_map`，写入全书 `sync_map[zh_start + i] = en_start + local_value`。
-4. 块与 `review_items` 的下标**全部转换为全书段落绝对下标**。
-5. 最后对 **`sync_map` 整体**再做一次非递减修正。
+This representation supports:
 
-### 7.2 `align_single_chapter`
+- One Chinese paragraph to multiple English paragraphs.
+- Multiple Chinese paragraphs to one English paragraph.
+- Multiple Chinese paragraphs to multiple English paragraphs.
 
-- 仅处理一章，返回 `local_sync_map`（已是**英文绝对段落下标**）、块、复核项，用于前端单章重算或调试。
+`expand_en_ranges_from_blocks(...)` is the legal range expansion path. `flatten_map_from_blocks(...)` is a scroll-sync projection and should not be treated as semantic truth.
 
-## 8. Web 服务（`web_server.py`）
+## 8. Hybrid Alignment Engine
 
-- `ThreadingHTTPServer` + `SimpleHTTPRequestHandler`：默认除 POST 外可服务静态文件（根目录 `index.html` 等）。
-- **POST `/api/chapter-match`**：`map_chapters_ai`。
-- **POST `/api/extract-epub`**：body 内 `epub_base64` → `extract_epub_document_from_bytes` → `paragraphs` + `chapters`。
-- **POST `/api/align-paragraphs`**：全书段落对齐（传全书段落与 `chapter_map`）。
-- **POST `/api/align-chapter`**：单章对齐。
+Main entry point:
 
-异常返回 HTTP 400 + `{"error": "..."}`，服务端打印 traceback。
+- `align_chapter_hybrid(...)`
 
-## 9. 前端与数据流（概要）
+Segment entry point:
 
-前端（`app.js`）典型流程：
+- `align_segment_hybrid(...)`
 
-1. 用户选择两本 EPUB → base64 → `/api/extract-epub` 各一次。
-2. 用章节标题列表 → `/api/chapter-match` 得 `chapter_map`（与中文列表等长的 `en_index` 序列）。
-3. `/api/align-paragraphs` 得 `sync_map`、`chapter_results`、`review_items`。
-4. 本地根据 `sync_map` 渲染中英对照视图（具体 DOM 逻辑见 `app.js`）。
+High-level flow:
 
-**决策**：**不在浏览器里解析 EPUB**；解析与对齐均在 Python 侧，避免重复实现与密钥暴露（API Key 仅服务器环境）。
+1. Load only local chapter paragraphs.
+2. Normalize and validate confirmed hard anchors.
+3. Split the chapter into free segments around hard anchors.
+4. Insert hard-anchor blocks directly.
+5. Align each free segment with `auto`, `force`, or `off` LLM policy.
+6. Repair/normalize blocks.
+7. Derive `en_ranges_by_zh`, `local_sync_map`, review items, metrics.
+8. Persist the result and cache key.
 
-## 10. 命令行与测试
+`llm_policy`:
 
-- `run_web.sh`：启动 `web_server.py`。
-- `paragraph_debug.py` / `chapter_debug.py`：离线跑章节映射与全书对齐，输出文本结果便于 diff。
-- `tests/`：`tests/test_align_paragraphs_in_chapter_llm.py` 会在配置了 `OPENAI_API_KEY` 时**真实调用**聊天补全接口；需本机可访问 `OPENAI_API_BASE_URL`（无拦截的 HTTP 代理，或正确配置 `NO_PROXY`）。在沙箱、公司代理返回 403、或未设置 Key 时，测试会跳过或失败，属环境而非业务逻辑错误。
-- `.gitignore` 已忽略 `tests/fixtures/*.local.txt` 等本地大文件占位。
+- `auto`: use LLM for small or imbalanced segments; use heuristic for large balanced segments.
+- `force`: try LLM for every non-hard-anchor segment.
+- `off`: do not call LLM.
 
-## 11. 已知权衡与限制
+If an API key is missing, `auto`/`force` fall back to heuristic and record `missing_api_key`.
 
-1. **成本与延迟**：全书对齐 = 1 次章节映射 + 每章至少 1～3 次 LLM（粗对齐 + 可能的大块细化）。
-2. **语言假设**：提示词与变量命名以**中-英**译本为主；换语言对需改 prompt 与章节映射逻辑。
-3. **sync_map 语义**：表示「每个中文段落锚定到哪个英文段落下标」，块内多对多由均匀/插值展开，**不等于**人工句级对齐。
-4. **EPUB 质量**：极差排版或 spine 中非 HTML 内容过多时，章节边界与段落列表可能不理想。
+If LLM rate limits during a request, `web_server.py` retries the chapter with LLM disabled and records:
 
-## 12. 与统计对齐器路线的对比（设计层面）
+- `metrics.alignment_source = "fallback"`
+- `metrics.llm_rate_limited = true`
+- `metrics.fallback_reason`
+- `decision_log[*].reason = "rate_limited_fallback"` for fallback heuristic segments.
 
-若采用 hunalign 等工具，通常是**全书线性文本**一次性对齐，不强制「先章后段」。本项目的**先章节映射、再章内 LLM** 是为了处理：**章节数不一致、译本增删章节、标题译法差异**等情况，用语义与顺序约束换取对译本文结构的鲁棒性，代价是 API 依赖与工程复杂度。
+## 9. Anchors and Mismatch Reports
 
----
+Hard anchors are continuous range constraints:
 
-文档版本与仓库代码同步维护；修改核心流程时请更新本节对应段落。
+- `zh_start`, `zh_end`
+- `en_start`, `en_end`
+- `kind = "hard"`
+- `confirmed = true`
+
+The backend also accepts legacy single-point fields and converts them into ranges.
+
+Validation rejects:
+
+- out-of-bounds ranges.
+- `start > end`.
+- overlapping hard anchors.
+- crossing hard anchors.
+
+Regeneration respects hard anchors even with `llm_policy="force"`. Anchor blocks are never sent to LLM.
+
+Mismatch reports are reader feedback:
+
+- `kind = "mismatch_report"`
+- `confirmed = false`
+- optional note/cache key payload.
+
+Mismatch reports do not affect alignment automatically. They are logged for later review and can be manually converted into hard anchors.
+
+## 10. Caching and Stability
+
+Chapter alignment cache keys include:
+
+- Chinese chapter text.
+- mapped English chapter text.
+- hard-anchor ranges.
+- engine version.
+- prompt version.
+- `llm_policy`.
+
+Including `llm_policy` prevents a user from selecting `off` and silently receiving a cached LLM result, or selecting `force` and silently receiving a heuristic result.
+
+Confirmed alignments remain stable until explicit regenerate.
+
+## 11. Jobs
+
+Background jobs are stored in `jobs`:
+
+- `prefetch`: align nearby future chapters.
+- `align_remaining`: align chapters from a starting chapter through the rest of the mapped book.
+
+Jobs record:
+
+- status (`pending`, `running`, `completed`, `failed`).
+- payload, including `llm_policy`.
+- result progress (`done_count`, `total_count`, `current_chapter`, `aligned_chapters`).
+
+The frontend polls active jobs and shows compact progress.
+
+## 12. Logging
+
+Two logs intentionally serve different purposes:
+
+- `log/llm_debug.log`: full LLM prompts/responses. Only written when `DUREADING_LLM_DEBUG=1`.
+- `log/server_events.log`: JSONL events for system decisions, cache hits, alignment saves, job progress/failure, and rate-limit fallback.
+
+Server events include `timestamp`, `event_type`, `project_id`, `chapter_index`, `debug_label`, and relevant decision fields. They do not include full prompt bodies.
+
+Neither `log/` nor `.env` should be committed.
+
+## 13. Frontend Architecture
+
+The frontend is framework-free:
+
+- `index.html`: DOM structure.
+- `app.js`: API calls, UI state, rendering, interactions.
+- `frontend_logic.js`: pure helper logic with Node tests.
+- `styles.css`: layout and visual system.
+
+Current layout:
+
+- Top compact Library panel for uploads, book list, project list, and status.
+- Left column inside workspace for chapters and background jobs.
+- Main Chinese reading column.
+- Right English lookup panel.
+- Alignment panel for current chapter actions.
+- Floating anchor tool in Alignment mode, collapsible to a small button.
+
+Reading behavior:
+
+- Chinese translation is primary.
+- Clicking a Chinese paragraph shows the matched English block plus one paragraph of context before/after.
+- Highlighting uses `en_ranges_by_zh`.
+- Scroll sync may continue using `local_sync_map`.
+
+Alignment behavior:
+
+- Mapping panel defaults collapsed after mappings are confirmed.
+- Current chapter alignment panel shows source (`LM`, `heuristic`, `mixed`, `fallback`) and decision summary.
+- Chapter list labels draft source as `draft · LM`, `draft · heuristic`, `draft · mixed`, or `draft · fallback`.
+- Anchor mode allows range-to-range hard anchors through the right lookup panel.
+
+## 14. Tests and Fixtures
+
+Key tests:
+
+- `tests/test_v2_api.py`: end-to-end API flow for books, projects, mappings, alignments, anchors, reports, jobs, deletes.
+- `tests/test_middlemarch_ch1_alignment.py`: fixed Middlemarch chapter-1 regression using real project alignment functions.
+- `tests/test_hybrid_alignment_policy.py`: LLM policy and hard-anchor behavior.
+- `tests/test_epub_footnotes.py`: structured footnote filtering regression.
+- `tests/frontend_logic.test.js`: range/highlight/source-label logic.
+- `tests/test_frontend_logic.py`: Python-side frontend helper expectations where applicable.
+
+Middlemarch fixtures under `tests/fixtures/` are intentionally committed when they are part of regression tests. Local/private fixture variants should use the ignored `*.local.txt` suffix.
+
+## 15. Known Limits
+
+- No authentication yet. Alignment mode is visible in the UI. If password-gating Alignment mode is required, implement it as a separate feature with documentation and tests.
+- LLM quality still depends on chapter/paragraph extraction quality.
+- EPUBs that embed translator notes as normal body paragraphs may still confuse alignment; structural footnotes are filtered, but semantically embedded notes need alignment-time handling or manual anchors.
+- Background jobs run in-process. This is appropriate for local use, not a production multi-user service.
+- The app is designed for local reading and debugging, not for storing secrets or private books in a remote deployment.

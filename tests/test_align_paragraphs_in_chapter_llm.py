@@ -79,12 +79,17 @@ def test_align_paragraphs_in_chapter_llm_structure() -> None:
     assert len(zh) >= 1 and len(en) >= 1
 
     config = get_api_config()
-    blocks = align_paragraphs_in_chapter_llm(
-        zh,
-        en,
-        config,
-        debug_label="pytest_align_chapter",
-    )
+    try:
+        blocks = align_paragraphs_in_chapter_llm(
+            zh,
+            en,
+            config,
+            debug_label="pytest_align_chapter",
+        )
+    except RuntimeError as exc:
+        if "网络错误" in str(exc):
+            pytest.skip(f"network unavailable in current environment: {exc}")
+        raise
 
     assert isinstance(blocks, list)
     assert len(blocks) >= 1
