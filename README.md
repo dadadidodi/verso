@@ -129,6 +129,14 @@ DUREADING_READER_PASSWORD="shared-reader-password" ./publish_reader.sh PROJECT_I
 
 This writes `dist-reader/` with only static reader assets and readable chapter JSON. Draft and confirmed chapters are exported; missing/skipped chapters are not. It does not include Align Mode, Library, EPUB files, SQLite, logs, jobs, anchors, or LLM debug data.
 
+To update an existing Reader deployment without changing the reader password, reuse the current exported password hash:
+
+```bash
+HASH="$(python3 -c 'import json; print(json.load(open("dist-reader/manifest.json"))["reader_password_hash"])')"
+python3 export_reader_site.py --project-id PROJECT_ID --out dist-reader --reader-password-hash "$HASH"
+vercel deploy dist-reader --prod
+```
+
 Preview locally:
 
 ```bash
@@ -140,6 +148,8 @@ Deploy manually to Vercel:
 ```bash
 vercel deploy dist-reader --prod
 ```
+
+Vercel prints a unique production deployment URL on every deploy, such as `https://dist-reader-xxxxx.vercel.app`. It also updates the stable alias, currently `https://dist-reader.vercel.app`, to point at the newest production deployment. Share the stable alias unless you specifically need to inspect one immutable deployment.
 
 The reader password is a lightweight frontend gate. It is useful for avoiding casual access, but it is not a strong security boundary because the site is still static.
 

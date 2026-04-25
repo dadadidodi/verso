@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import io
+import zipfile
 from pathlib import Path
 
 import httpx
@@ -15,6 +17,184 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 def _range_contains(ranges: list[list[int]], zh_index: int, en_index: int) -> bool:
     start, end = ranges[zh_index]
     return start <= en_index <= end
+
+
+async def _upload_middlemarch_pair(client: httpx.AsyncClient) -> tuple[int, int]:
+    zh_data = (REPO_ROOT / "data" / "CnMiddlemarch.epub").read_bytes()
+    en_data = (REPO_ROOT / "data" / "EnMiddlemarch.epub").read_bytes()
+    zh_resp = await client.post(
+        "/api/books",
+        data={"language": "zh"},
+        files={"file": ("CnMiddlemarch.epub", zh_data, "application/epub+zip")},
+    )
+    en_resp = await client.post(
+        "/api/books",
+        data={"language": "en"},
+        files={"file": ("EnMiddlemarch.epub", en_data, "application/epub+zip")},
+    )
+    assert zh_resp.status_code == 200
+    assert en_resp.status_code == 200
+    return int(zh_resp.json()["book"]["id"]), int(en_resp.json()["book"]["id"])
+
+
+def _empty_zip_bytes() -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w"):
+        pass
+    return buf.getvalue()
+
+
+def test_upload_bad_epub_returns_400(tmp_path: Path) -> None:
+    app = create_app(tmp_path / "storage")
+
+    async def run_flow() -> None:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            not_zip_resp = await client.post(
+                "/api/books",
+                data={"language": "zh"},
+                files={"file": ("bad.epub", b"not an epub", "application/epub+zip")},
+            )
+            assert not_zip_resp.status_code == 400
+            assert "epub" in str(not_zip_resp.json()["detail"]).lower()
+
+            broken_epub_resp = await client.post(
+                "/api/books",
+                data={"language": "en"},
+                files={"file": ("empty.epub", _empty_zip_bytes(), "application/epub+zip")},
+            )
+            assert broken_epub_resp.status_code == 400
+            assert "epub" in str(broken_epub_resp.json()["detail"]).lower()
+
+    asyncio.run(run_flow())
+
+
+def test_project_and_mapping_validation_errors_do_not_write_bad_state(tmp_path: Path) -> None:
+    app = create_app(tmp_path / "storage")
+
+    async def run_flow() -> None:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            missing_resp = await client.post("/api/projects", json={"zh_book_id": 9999, "en_book_id": 10000})
+            assert missing_resp.status_code in {400, 404}
+            assert (await client.get("/api/projects")).json()["projects"] == []
+
+            zh_book_id, en_book_id = await _upload_middlemarch_pair(client)
+
+            swapped_resp = await client.post(
+                "/api/projects",
+                json={"zh_book_id": en_book_id, "en_book_id": zh_book_id},
+            )
+            assert swapped_resp.status_code == 400
+            assert (await client.get("/api/projects")).json()["projects"] == []
+
+            project_resp = await client.post(
+                "/api/projects",
+                json={"zh_book_id": zh_book_id, "en_book_id": en_book_id},
+            )
+            assert project_resp.status_code == 200
+            project_id = project_resp.json()["project"]["id"]
+
+            suggest_resp = await client.post(f"/api/projects/{project_id}/chapter-mapping/suggest?allow_llm=false")
+            assert suggest_resp.status_code == 200
+            original_mappings = suggest_resp.json()["mappings"]
+            assert original_mappings
+
+            bad_zh_payload = {
+                "mappings": [
+                    {
+                        **original_mappings[0],
+                        "zh_chapter_index": 99999,
+                    }
+                ]
+            }
+            bad_zh_resp = await client.put(
+                f"/api/projects/{project_id}/chapter-mapping",
+                json=bad_zh_payload,
+            )
+            assert bad_zh_resp.status_code == 400
+            after_bad_zh = await client.get(f"/api/projects/{project_id}/chapter-mapping")
+            assert after_bad_zh.json()["mappings"] == original_mappings
+
+            bad_en_payload = {
+                "mappings": [
+                    {
+                        **original_mappings[0],
+                        "en_chapter_index": 99999,
+                    }
+                ]
+            }
+            bad_en_resp = await client.put(
+                f"/api/projects/{project_id}/chapter-mapping",
+                json=bad_en_payload,
+            )
+            assert bad_en_resp.status_code == 400
+            after_bad_en = await client.get(f"/api/projects/{project_id}/chapter-mapping")
+            assert after_bad_en.json()["mappings"] == original_mappings
+
+            duplicate_payload = {"mappings": [original_mappings[0], original_mappings[0]]}
+            duplicate_resp = await client.put(
+                f"/api/projects/{project_id}/chapter-mapping",
+                json=duplicate_payload,
+            )
+            assert duplicate_resp.status_code == 400
+            after_duplicate = await client.get(f"/api/projects/{project_id}/chapter-mapping")
+            assert after_duplicate.json()["mappings"] == original_mappings
+
+    asyncio.run(run_flow())
+
+
+def test_active_background_jobs_are_reused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    app = create_app(tmp_path / "storage")
+
+    import web_server as web_server_module
+
+    monkeypatch.setattr(web_server_module, "_background_prefetch", lambda *args, **kwargs: None)
+
+    async def run_flow() -> None:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            zh_book_id, en_book_id = await _upload_middlemarch_pair(client)
+            project_resp = await client.post(
+                "/api/projects",
+                json={"zh_book_id": zh_book_id, "en_book_id": en_book_id},
+            )
+            project_id = project_resp.json()["project"]["id"]
+
+            first_prefetch = await client.post(
+                f"/api/projects/{project_id}/jobs/prefetch",
+                json={"chapter_index": 0, "count": 2, "allow_llm": False, "llm_policy": "off"},
+            )
+            second_prefetch = await client.post(
+                f"/api/projects/{project_id}/jobs/prefetch",
+                json={"chapter_index": 0, "count": 2, "allow_llm": False, "llm_policy": "off"},
+            )
+            assert first_prefetch.status_code == 200
+            assert second_prefetch.status_code == 200
+            assert first_prefetch.json()["reused"] is False
+            assert second_prefetch.json()["reused"] is True
+            assert second_prefetch.json()["job"]["id"] == first_prefetch.json()["job"]["id"]
+
+            first_remaining = await client.post(
+                f"/api/projects/{project_id}/jobs/align-remaining",
+                json={"chapter_index": 0, "count": 2, "allow_llm": False, "llm_policy": "off"},
+            )
+            second_remaining = await client.post(
+                f"/api/projects/{project_id}/jobs/align-remaining",
+                json={"chapter_index": 0, "count": 2, "allow_llm": False, "llm_policy": "off"},
+            )
+            assert first_remaining.status_code == 200
+            assert second_remaining.status_code == 200
+            assert first_remaining.json()["reused"] is False
+            assert second_remaining.json()["reused"] is True
+            assert second_remaining.json()["job"]["id"] == first_remaining.json()["job"]["id"]
+
+            jobs = (await client.get(f"/api/projects/{project_id}/jobs")).json()["jobs"]
+            active_jobs = [job for job in jobs if job["status"] in {"pending", "running"}]
+            assert len(active_jobs) == 2
+            assert {job["type"] for job in active_jobs} == {"prefetch", "align_remaining"}
+
+    asyncio.run(run_flow())
 
 
 def test_v2_project_flow(tmp_path: Path) -> None:

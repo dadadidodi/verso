@@ -327,4 +327,13 @@ Align can remain local while a reader-only static site is published:
 - The static reader has no Library, Alignment mode, upload/delete actions, anchors, jobs, OpenAI key, SQLite, EPUB files, or LLM debug logs.
 - `publish_reader.sh` wraps export and prints the Vercel deploy command.
 
+Publishing flow:
+
+1. Run local Align and save the latest draft/confirmed chapter alignments.
+2. Export `dist-reader/` with `publish_reader.sh` or `export_reader_site.py`.
+3. Deploy with `vercel deploy dist-reader --prod`.
+4. Check the stable alias, currently `https://dist-reader.vercel.app`.
+
+When updating published content, reuse the existing `reader_password_hash` from `dist-reader/manifest.json` if the reader password should stay unchanged. Vercel creates a new immutable production deployment URL each time, then moves the stable alias to the newest production deployment.
+
 The static reader uses a frontend password hash and `sessionStorage`. This is intentionally lightweight and not a strong security boundary; use server-side auth or Cloudflare Access later if content protection becomes important.
