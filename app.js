@@ -569,7 +569,7 @@ function updateAnchorFloatUI() {
     els.anchorFloatBody.classList.toggle("hidden", state.anchorFloatCollapsed);
   }
   if (els.anchorFloatToggle) {
-    els.anchorFloatToggle.textContent = state.anchorFloatCollapsed ? "锚点" : "收起";
+    els.anchorFloatToggle.textContent = state.anchorFloatCollapsed ? "展开" : "收起";
     els.anchorFloatToggle.setAttribute("aria-expanded", state.anchorFloatCollapsed ? "false" : "true");
   }
 }
@@ -1377,8 +1377,17 @@ els.anchorMode.addEventListener("change", () => {
   resetAnchorDraft();
 });
 
-els.anchorFloatToggle?.addEventListener("click", () => {
+els.anchorFloatToggle?.addEventListener("click", (event) => {
+  event.stopPropagation();
   state.anchorFloatCollapsed = !state.anchorFloatCollapsed;
+  updateAnchorFloatUI();
+});
+
+els.anchorFloat?.addEventListener("click", () => {
+  if (!state.anchorFloatCollapsed) {
+    return;
+  }
+  state.anchorFloatCollapsed = false;
   updateAnchorFloatUI();
 });
 

@@ -713,6 +713,20 @@ class DuReadingStore:
             row = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
             return self._job_row_to_dict(row)
 
+    def get_active_job(self, project_id: int, job_type: str) -> Optional[Dict[str, Any]]:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT *
+                FROM jobs
+                WHERE project_id = ? AND type = ? AND status IN ('pending', 'running')
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (project_id, job_type),
+            ).fetchone()
+            return self._job_row_to_dict(row) if row is not None else None
+
     def update_job(self, job_id: int, *, status: str, result: Dict[str, Any]) -> Dict[str, Any]:
         now = utc_now()
         with self._connect() as conn:
