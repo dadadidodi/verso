@@ -4,6 +4,7 @@ log/
 .pycache/
 __pycache__/
 storage/
+dist-reader/
 tmp_test_*/
 result.txt
 tests/fixtures/*.local.txt

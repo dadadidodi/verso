@@ -119,6 +119,30 @@ Important tests:
 
 LLM integration tests skip when no API key/network is available.
 
+## Publish A Static Reader
+
+Keep Align local, then export a reader-only static site:
+
+```bash
+DUREADING_READER_PASSWORD="shared-reader-password" ./publish_reader.sh PROJECT_ID
+```
+
+This writes `dist-reader/` with only static reader assets and readable chapter JSON. Draft and confirmed chapters are exported; missing/skipped chapters are not. It does not include Align Mode, Library, EPUB files, SQLite, logs, jobs, anchors, or LLM debug data.
+
+Preview locally:
+
+```bash
+python3 -m http.server 9000 --directory dist-reader
+```
+
+Deploy manually to Vercel:
+
+```bash
+vercel deploy dist-reader --prod
+```
+
+The reader password is a lightweight frontend gate. It is useful for avoiding casual access, but it is not a strong security boundary because the site is still static.
+
 ## Commit Hygiene
 
 Before pushing:
