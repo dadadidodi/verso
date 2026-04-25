@@ -1,44 +1,139 @@
 # DuReading
 
-中英对照阅读实验工具。
+DuReading V2 is a local bilingual reading workspace for pairing Chinese translations with English source EPUBs.
 
-设计与实现说明（EPUB 解析、LLM 章节/段落对齐、`sync_map` 语义、API 与权衡）见 **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**。
+The product is reader-first:
 
-## 网页版运行
+- `Library`: upload and reuse multiple EPUBs.
+- `Project`: pair one Chinese book with one English book.
+- `Read mode`: fast chapter reading from stored alignment only; no AI calls while reading.
+- `Alignment mode`: chapter mapping, chapter alignment, block anchors, mismatch reports, confirm/skip/regenerate.
 
-1. 启动本地网页服务（包含章节匹配 API）：
+The current UI slogan is intentionally opinionated: `这要命的译文！！！`
+
+## Run
 
 ```bash
 ./run_web.sh
 ```
 
-默认端口 `8000`，浏览器打开：
+The default port is `8000`: [http://localhost:8000](http://localhost:8000).
 
-- <http://localhost:8000>
-
-可指定端口：
+To choose another port:
 
 ```bash
 ./run_web.sh 9000
 ```
 
-## 章节提取/匹配命令行测试
+You can also run the FastAPI app directly:
 
-### 1) 配置 `.env`
+```bash
+python3 web_server.py
+```
+
+## Environment
+
+LLM features are optional. Without an API key, DuReading still runs with deterministic fallback/heuristic behavior.
+
+For LLM chapter mapping and ambiguous paragraph alignment, create a local `.env` file:
 
 ```env
-OPENAI_API_KEY=你的key
+OPENAI_API_KEY=your-key-here
 OPENAI_API_BASE_URL=https://api.openai.com/v1
 OPENAI_MODEL=gpt-4.1
 ```
 
-### 2) 运行固定测试
+Useful optional variables:
+
+- `DUREADING_STORAGE_DIR`: local storage directory, default `storage/`.
+- `DUREADING_LLM_DEBUG=1`: write full LLM prompts/responses to `log/llm_debug.log`.
+- `DUREADING_LLM_DEBUG_FILE`: override the LLM debug log path.
+- `DUREADING_SERVER_EVENTS_FILE`: override the server decision/event log path, default `log/server_events.log`.
+
+Do not commit `.env`, `log/`, or `storage/`.
+
+Security note: the current app is intended for local use and does not implement authentication yet. Do not expose it as a public remote service with private books or API credentials.
+
+## Storage
+
+V2 persists state locally with SQLite plus files:
+
+- `storage/app.db`: book/project/mapping/alignment/anchor/job metadata.
+- `storage/books/{book_id}/source.epub`: uploaded EPUB.
+- `storage/books/{book_id}/paragraphs.json`: parsed paragraph artifact.
+- `storage/books/{book_id}/chapters.json`: parsed chapter artifact.
+- `storage/projects/{project_id}/`: optional project artifacts/debug snapshots.
+
+Books are reusable across projects. Deleting a book also deletes dependent projects.
+
+## Alignment Model
+
+DuReading no longer treats a chapter as a single point map. The canonical paragraph alignment output is block/range based:
+
+- `blocks`: the semantic truth, supporting 1:N, N:1, and N:M paragraph matches.
+- `en_ranges_by_zh`: derived Chinese paragraph to English range lookup for UI highlighting.
+- `local_sync_map`: compatibility/scroll-sync projection only.
+
+`Alignment mode` supports hard anchors as continuous Chinese range to continuous English range constraints. Regeneration respects confirmed hard anchors.
+
+The LLM policy is explicit:
+
+- `auto`: use heuristics first; use LLM for small/imbalanced segments.
+- `force`: try LLM for every non-anchor segment.
+- `off`: pure heuristic.
+
+Each alignment stores `metrics.decision_log` and `metrics.alignment_source` (`lm`, `heuristic`, `mixed`, `fallback`, `skipped`) so draft results are explainable in the UI.
+
+## Logging
+
+Logs are intentionally split:
+
+- `log/llm_debug.log`: full prompt/response records, only when `DUREADING_LLM_DEBUG=1`.
+- `log/server_events.log`: JSONL server events such as alignment decisions, cache hits, job progress, rate-limit fallback.
+
+`server_events.log` does not contain full prompts or EPUB text by design.
+
+## Tests
+
+Install dev dependencies if needed:
 
 ```bash
-./run_match_test.sh
+python3 -m pip install -r requirements-dev.txt
 ```
 
-说明：
-- 会先比对章节映射结果 `result.txt` 与 `ref.txt`。
-- 然后执行段落对齐并生成 `paragraph_result.txt`。
-- 若存在 `paragraph_ref.txt`，会继续做严格比对。
+Run the full test suite:
+
+```bash
+python3 -m pytest -q
+node --test tests/frontend_logic.test.js
+node --check app.js
+```
+
+Important tests:
+
+- `tests/test_v2_api.py`: FastAPI project/book/alignment/anchor/job flow.
+- `tests/test_middlemarch_ch1_alignment.py`: fixed Middlemarch chapter-1 block alignment regression.
+- `tests/test_hybrid_alignment_policy.py`: `llm_policy`, hard-anchor, missing-key behavior.
+- `tests/test_epub_footnotes.py`: EPUB footnote filtering regression.
+- `tests/frontend_logic.test.js`: frontend range/highlight/source-label logic.
+
+LLM integration tests skip when no API key/network is available.
+
+## Commit Hygiene
+
+Before pushing:
+
+```bash
+git status --short
+rg -n "sk-[A-Za-z0-9_-]+|OPENAI_API_KEY\\s*=|Authorization: Bearer|Bearer [A-Za-z0-9._-]+" . --glob '!storage/**' --glob '!log/**' --glob '!.git/**'
+```
+
+Expected non-source local artifacts are ignored:
+
+- `.env`
+- `log/`
+- `storage/`
+- `tmp_test_*/`
+- `tests/fixtures/*.local.txt`
+
+Architecture details are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
