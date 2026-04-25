@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -135,6 +136,44 @@ def _project_overview_or_404(store: DuReadingStore, project_id: int) -> Dict[str
         return store.build_project_overview(project_id)
     except KeyError as exc:
         raise _http_404(str(exc)) from exc
+
+
+def _book_or_404(store: DuReadingStore, book_id: int) -> Dict[str, Any]:
+    try:
+        return store.get_book(book_id)
+    except KeyError as exc:
+        raise _http_404(str(exc)) from exc
+
+
+def _validate_project_books(store: DuReadingStore, zh_book_id: int, en_book_id: int) -> None:
+    zh_book = _book_or_404(store, zh_book_id)
+    en_book = _book_or_404(store, en_book_id)
+    if zh_book.get("language") != "zh":
+        raise HTTPException(status_code=400, detail="zh_book_id must reference a zh book")
+    if en_book.get("language") != "en":
+        raise HTTPException(status_code=400, detail="en_book_id must reference an en book")
+
+
+def _validate_mapping_update(
+    ctx: Dict[str, Any],
+    mappings: List[ChapterMappingItem],
+) -> List[Dict[str, Any]]:
+    zh_count = len(ctx["zh_chapters"])
+    en_count = len(ctx["en_chapters"])
+    seen_zh: set[int] = set()
+    out: List[Dict[str, Any]] = []
+    for item in mappings:
+        zh_index = int(item.zh_chapter_index)
+        en_index = int(item.en_chapter_index)
+        if zh_index in seen_zh:
+            raise HTTPException(status_code=400, detail=f"duplicate zh_chapter_index {zh_index}")
+        if not (0 <= zh_index < zh_count):
+            raise HTTPException(status_code=400, detail=f"zh_chapter_index {zh_index} out of range")
+        if not (0 <= en_index < en_count):
+            raise HTTPException(status_code=400, detail=f"en_chapter_index {en_index} out of range")
+        seen_zh.add(zh_index)
+        out.append(item.model_dump())
+    return out
 
 
 def _chapter_scope(ctx: Dict[str, Any], chapter_index: int) -> Dict[str, Any]:
@@ -641,7 +680,10 @@ def create_app(storage_root: Optional[Path | str] = None) -> FastAPI:
             raise HTTPException(status_code=400, detail="empty upload")
         if language not in {"zh", "en"}:
             raise HTTPException(status_code=400, detail="language must be zh or en")
-        book = store.create_or_get_book(language=language, filename=file.filename or "book.epub", data=data)
+        try:
+            book = store.create_or_get_book(language=language, filename=file.filename or "book.epub", data=data)
+        except (zipfile.BadZipFile, ValueError, KeyError) as exc:
+            raise HTTPException(status_code=400, detail=f"invalid EPUB: {exc}") from exc
         return {"book": book}
 
     @app.get("/api/books/{book_id}")
@@ -673,6 +715,7 @@ def create_app(storage_root: Optional[Path | str] = None) -> FastAPI:
 
     @app.post("/api/projects")
     def create_project(request: ProjectCreateRequest) -> Dict[str, Any]:
+        _validate_project_books(store, request.zh_book_id, request.en_book_id)
         project = store.create_project(
             zh_book_id=request.zh_book_id,
             en_book_id=request.en_book_id,
@@ -723,7 +766,9 @@ def create_app(storage_root: Optional[Path | str] = None) -> FastAPI:
 
     @app.put("/api/projects/{project_id}/chapter-mapping")
     def put_mapping(project_id: int, request: ChapterMappingUpdateRequest) -> Dict[str, Any]:
-        store.replace_chapter_mappings(project_id, [item.model_dump() for item in request.mappings], confirmed=False)
+        ctx = _project_context(store, project_id)
+        mappings = _validate_mapping_update(ctx, request.mappings)
+        store.replace_chapter_mappings(project_id, mappings, confirmed=False)
         return {"mappings": store.list_chapter_mappings(project_id)}
 
     @app.post("/api/projects/{project_id}/chapter-mapping/confirm")
@@ -885,6 +930,10 @@ def create_app(storage_root: Optional[Path | str] = None) -> FastAPI:
 
     @app.post("/api/projects/{project_id}/jobs/prefetch")
     def prefetch_job(project_id: int, request: JobRequest, background_tasks: BackgroundTasks) -> Dict[str, Any]:
+        _project_overview_or_404(store, project_id)
+        active_job = store.get_active_job(project_id, "prefetch")
+        if active_job is not None:
+            return {"job": active_job, "reused": True}
         job = store.create_job(project_id, "prefetch", request.model_dump())
         background_tasks.add_task(
             _background_prefetch,
@@ -896,11 +945,14 @@ def create_app(storage_root: Optional[Path | str] = None) -> FastAPI:
             allow_llm=request.allow_llm,
             llm_policy=request.llm_policy,
         )
-        return {"job": job}
+        return {"job": job, "reused": False}
 
     @app.post("/api/projects/{project_id}/jobs/align-remaining")
     def align_remaining(project_id: int, request: JobRequest, background_tasks: BackgroundTasks) -> Dict[str, Any]:
         ctx = _project_context(store, project_id)
+        active_job = store.get_active_job(project_id, "align_remaining")
+        if active_job is not None:
+            return {"job": active_job, "reused": True}
         job = store.create_job(project_id, "align_remaining", request.model_dump())
         background_tasks.add_task(
             _background_prefetch,
@@ -912,7 +964,7 @@ def create_app(storage_root: Optional[Path | str] = None) -> FastAPI:
             allow_llm=request.allow_llm,
             llm_policy=request.llm_policy,
         )
-        return {"job": job}
+        return {"job": job, "reused": False}
 
     @app.get("/api/projects/{project_id}/jobs")
     def list_jobs(project_id: int) -> Dict[str, Any]:
