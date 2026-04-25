@@ -316,3 +316,15 @@ Middlemarch fixtures under `tests/fixtures/` are intentionally committed when th
 - EPUBs that embed translator notes as normal body paragraphs may still confuse alignment; structural footnotes are filtered, but semantically embedded notes need alignment-time handling or manual anchors.
 - Background jobs run in-process. This is appropriate for local use, not a production multi-user service.
 - The app is designed for local reading and debugging, not for storing secrets or private books in a remote deployment.
+
+## 16. Static Reader Publishing
+
+Align can remain local while a reader-only static site is published:
+
+- `export_reader_site.py` reads local `storage/` and exports `dist-reader/`.
+- Draft and confirmed chapters are exported by default; missing/skipped chapters are not.
+- Exported assets are static: `index.html`, `reader.js`, `reader.css`, `manifest.json`, `chapters/{chapter_index}.json`.
+- The static reader has no Library, Alignment mode, upload/delete actions, anchors, jobs, OpenAI key, SQLite, EPUB files, or LLM debug logs.
+- `publish_reader.sh` wraps export and prints the Vercel deploy command.
+
+The static reader uses a frontend password hash and `sessionStorage`. This is intentionally lightweight and not a strong security boundary; use server-side auth or Cloudflare Access later if content protection becomes important.
