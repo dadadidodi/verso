@@ -19,7 +19,8 @@ The application is local-first. There is no cloud sync, account system, or multi
 | --- | --- | --- |
 | FastAPI app | `web_server.py` | Static app serving plus project/book/alignment APIs |
 | Persistence | `storage_v2.py` | SQLite schema, migrations, artifacts, snapshots |
-| EPUB parsing | `chapter_catalog.py` | Parse EPUB into normalized paragraphs and chapter ranges |
+| Source parsing | `document_parser.py`, `chapter_catalog.py` | Parse uploaded EPUBs into normalized paragraphs and chapter ranges |
+| PDF-to-EPUB tooling | `pdf_to_epub_ocr.py` | One-time local conversion of large scanned PDFs into clean EPUBs |
 | LLM utilities | `alignment_common.py` | `.env`, API config, OpenAI-compatible JSON calls, LLM debug log |
 | Chapter/paragraph alignment | `hybrid_alignment.py`, `paragraph_alignment.py`, `alignment_service.py` | Chapter mapping, hybrid alignment, fallback/debug LLM paths |
 | Server events | `server_events.py` | JSONL decision/job/cache logging |
@@ -34,7 +35,7 @@ SQLite lives under `storage/app.db` by default. `DUREADING_STORAGE_DIR` can poin
 
 Main tables:
 
-- `books`: uploaded EPUB metadata, language, content hash, title, source path.
+- `books`: uploaded EPUB metadata, language, content hash, title, source format/path.
 - `book_artifacts`: parser artifact paths, stats, parser version.
 - `projects`: one Chinese book paired with one English book.
 - `chapter_mappings`: Chinese chapter index to English chapter index, confidence/source/reason/confirmation.
@@ -51,13 +52,14 @@ Filesystem layout:
 
 Uploaded books are reusable. Projects reference book IDs rather than duplicating EPUB artifacts.
 
-## 4. EPUB Parsing
+## 4. Source Parsing
 
-`chapter_catalog.py` parses EPUB spine HTML/XHTML files into:
+All source files normalize to:
 
 - `paragraphs: list[str]`
 - `chapters: list[{title, path, start, end}]`
 
+EPUB parsing remains in `chapter_catalog.py` and parses spine HTML/XHTML files.
 Chapter titles come from EPUB nav/NCX when available, then fallback heading/title extraction.
 
 Paragraph extraction is structure-first:
@@ -67,7 +69,15 @@ Paragraph extraction is structure-first:
 3. Extract text from paragraph/list/blockquote/heading tags.
 4. If no structured paragraphs are found, fallback to stripped text split by blank lines.
 
-`PARSER_VERSION` is persisted in `book_artifacts`, so stale artifacts can be refreshed when parser behavior changes.
+The web app intentionally accepts EPUB uploads only. For PDFs, the supported path is the standalone `pdf_to_epub_ocr.py` tool before uploading:
+
+- It extracts/OCRs each page once and writes `ocr_pages.jsonl` in a work directory.
+- It uses PDF bookmarks as EPUB chapters when available, then heading detection, then a whole-book fallback.
+- It emits a standard EPUB with `content.opf`, `nav.xhtml`, `toc.ncx`, chapter XHTML files, and simple CSS.
+- It validates the generated EPUB with the existing `chapter_catalog.py` parser and writes `parse_report.json` plus `preview.md`.
+- The generated EPUB can be uploaded through the normal Library flow and then follows the same alignment/reader path as any other EPUB.
+
+`parser_version` is persisted in `book_artifacts`, so stale artifacts can be refreshed when parser behavior changes.
 
 ## 5. Public API Shape
 
@@ -304,6 +314,8 @@ Key tests:
 - `tests/test_middlemarch_ch1_alignment.py`: fixed Middlemarch chapter-1 regression using real project alignment functions.
 - `tests/test_hybrid_alignment_policy.py`: LLM policy and hard-anchor behavior.
 - `tests/test_epub_footnotes.py`: structured footnote filtering regression.
+- `tests/test_pdf_upload_rejected.py`: direct PDF upload is rejected; PDFs must be converted to EPUB first.
+- `tests/test_pdf_to_epub_ocr.py`: standalone PDF-to-EPUB conversion and resume cache behavior.
 - `tests/frontend_logic.test.js`: range/highlight/source-label logic.
 - `tests/test_frontend_logic.py`: Python-side frontend helper expectations where applicable.
 
@@ -313,6 +325,7 @@ Middlemarch fixtures under `tests/fixtures/` are intentionally committed when th
 
 - No authentication yet. Alignment mode is visible in the UI. If password-gating Alignment mode is required, implement it as a separate feature with documentation and tests.
 - LLM quality still depends on chapter/paragraph extraction quality.
+- PDF-to-EPUB conversion preserves logical structure, not exact PDF typography or page images.
 - EPUBs that embed translator notes as normal body paragraphs may still confuse alignment; structural footnotes are filtered, but semantically embedded notes need alignment-time handling or manual anchors.
 - Background jobs run in-process. This is appropriate for local use, not a production multi-user service.
 - The app is designed for local reading and debugging, not for storing secrets or private books in a remote deployment.
@@ -324,7 +337,7 @@ Align can remain local while a reader-only static site is published:
 - `export_reader_site.py` reads local `storage/` and exports `dist-reader/`.
 - Draft and confirmed chapters are exported by default; missing/skipped chapters are not.
 - Exported assets are static: `index.html`, `reader.js`, `reader.css`, `manifest.json`, `chapters/{chapter_index}.json`.
-- The static reader has no Library, Alignment mode, upload/delete actions, anchors, jobs, OpenAI key, SQLite, EPUB files, or LLM debug logs.
+- The static reader has no Library, Alignment mode, upload/delete actions, anchors, jobs, OpenAI key, SQLite, source EPUB files, or LLM debug logs.
 - `publish_reader.sh` wraps export and prints the Vercel deploy command.
 
 Publishing flow:
@@ -334,6 +347,6 @@ Publishing flow:
 3. Deploy with `vercel deploy dist-reader --prod`.
 4. Check the stable alias, currently `https://dist-reader.vercel.app`.
 
-When updating published content, reuse the existing `reader_password_hash` from `dist-reader/manifest.json` if the reader password should stay unchanged. Vercel creates a new immutable production deployment URL each time, then moves the stable alias to the newest production deployment.
+When updating published content, reuse the existing `reader_password_hashes` from `dist-reader/manifest.json` if the reader passwords should stay unchanged. The legacy `reader_password_hash` field is still exported for compatibility. Vercel creates a new immutable production deployment URL each time, then moves the stable alias to the newest production deployment.
 
-The static reader uses a frontend password hash and `sessionStorage`. This is intentionally lightweight and not a strong security boundary; use server-side auth or Cloudflare Access later if content protection becomes important.
+The static reader can accept multiple frontend password hashes and uses `sessionStorage` after unlock. This is intentionally lightweight and not a strong security boundary; use server-side auth or Cloudflare Access later if content protection becomes important.

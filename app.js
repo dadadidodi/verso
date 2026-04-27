@@ -156,6 +156,15 @@ function setStatus(message, isError = false) {
   els.statusText.style.color = isError ? "var(--danger)" : "var(--muted)";
 }
 
+function setBusyStatus(message) {
+  setStatus(message);
+  els.statusText.classList.add("is-busy");
+}
+
+function clearBusyStatus() {
+  els.statusText.classList.remove("is-busy");
+}
+
 async function api(path, options = {}) {
   const opts = { ...options };
   opts.headers = opts.headers || {};
@@ -204,7 +213,8 @@ function updateLibraryUI() {
 }
 
 function bookLabel(book) {
-  return `#${book.id} · ${book.title} · ${book.language.toUpperCase()} · ${book.chapter_count}章 / ${book.paragraph_count}段`;
+  const format = (book.source_format || "epub").toUpperCase();
+  return `#${book.id} · ${book.title} · ${book.language.toUpperCase()} · ${format} · ${book.chapter_count}章 / ${book.paragraph_count}段`;
 }
 
 function renderBookOptions() {
@@ -229,7 +239,7 @@ function renderBookList() {
         <div class="list-card">
           <h4>${escapeHtml(book.title)}</h4>
           <div class="meta-line">${escapeHtml(book.source_filename)}</div>
-          <div class="meta-line">${book.language.toUpperCase()} · ${book.chapter_count}章 · ${book.paragraph_count}段 · ${book.char_total} chars</div>
+          <div class="meta-line">${book.language.toUpperCase()} · ${(book.source_format || "epub").toUpperCase()} · ${book.chapter_count}章 · ${book.paragraph_count}段 · ${book.char_total} chars</div>
           <div class="card-actions">
             <button class="secondary-btn danger-btn tiny-btn" type="button" data-book-delete-id="${book.id}">删除书籍</button>
           </div>
@@ -951,13 +961,24 @@ async function uploadBook() {
     setStatus("请先选择 EPUB 文件。", true);
     return;
   }
+  if (!file.name.toLowerCase().endsWith(".epub")) {
+    setStatus("书库现在只接受 EPUB。PDF 请先用 pdf_to_epub_ocr.py 本地转换成 EPUB。", true);
+    return;
+  }
+  setBusyStatus(`正在上传并解析 ${file.name}...`);
+  els.uploadBookBtn.disabled = true;
   const form = new FormData();
   form.append("language", els.bookLanguage.value);
   form.append("file", file);
-  await api("/api/books", { method: "POST", body: form });
-  els.bookFile.value = "";
-  await refreshLibrary();
-  setStatus("书籍已上传到书库。");
+  try {
+    const payload = await api("/api/books", { method: "POST", body: form });
+    els.bookFile.value = "";
+    await refreshLibrary();
+    setStatus(`《${payload.book.title}》已导入书库：${payload.book.chapter_count}章 / ${payload.book.paragraph_count}段。`);
+  } finally {
+    els.uploadBookBtn.disabled = false;
+    clearBusyStatus();
+  }
 }
 
 async function createProject() {
@@ -983,7 +1004,7 @@ async function deleteCurrentProject() {
     return;
   }
   const project = state.currentProject.project;
-  const confirmed = window.confirm(`确定删除项目 #${project.id} 吗？\n这会删除该项目的映射、对齐和 anchor，但不会删除书库里的 EPUB。`);
+  const confirmed = window.confirm(`确定删除项目 #${project.id} 吗？\n这会删除该项目的映射、对齐和 anchor，但不会删除书库里的书籍源文件。`);
   if (!confirmed) {
     return;
   }
@@ -1022,7 +1043,7 @@ async function deleteBook(bookId) {
   const projectWarning = relatedProjects.length
     ? `\n\n这本书正在被 ${relatedProjects.length} 个项目使用；删除书籍会同时删除这些项目的映射、对齐和 anchor。`
     : "";
-  const confirmed = window.confirm(`确定从书库删除《${book.title}》吗？\nEPUB 和解析缓存都会删除。${projectWarning}`);
+  const confirmed = window.confirm(`确定从书库删除《${book.title}》吗？\n源文件和解析缓存都会删除。${projectWarning}`);
   if (!confirmed) {
     return;
   }

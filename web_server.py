@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import zipfile
 from pathlib import Path
@@ -15,6 +16,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from alignment_common import get_api_config
+from document_parser import detect_source_format
 from hybrid_alignment import align_chapter_hybrid, suggest_chapter_mappings
 from paragraph_alignment import AlignmentBlock, expand_en_ranges_from_blocks
 from server_events import append_server_event
@@ -680,10 +682,18 @@ def create_app(storage_root: Optional[Path | str] = None) -> FastAPI:
             raise HTTPException(status_code=400, detail="empty upload")
         if language not in {"zh", "en"}:
             raise HTTPException(status_code=400, detail="language must be zh or en")
+        source_format = "book"
         try:
-            book = store.create_or_get_book(language=language, filename=file.filename or "book.epub", data=data)
+            filename = file.filename or "book"
+            source_format = detect_source_format(filename, file.content_type or "")
+            book = store.create_or_get_book(
+                language=language,
+                filename=filename,
+                data=data,
+                content_type=file.content_type or "",
+            )
         except (zipfile.BadZipFile, ValueError, KeyError) as exc:
-            raise HTTPException(status_code=400, detail=f"invalid EPUB: {exc}") from exc
+            raise HTTPException(status_code=400, detail=f"invalid {source_format.upper()} book source: {exc}") from exc
         return {"book": book}
 
     @app.get("/api/books/{book_id}")

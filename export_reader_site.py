@@ -365,7 +365,8 @@ async function sha256Hex(text) {
 }
 
 function authKey() {
-  return `dureading_reader_auth_${String(state.manifest?.reader_password_hash || "").slice(0, 16)}`;
+  const hashes = passwordHashes();
+  return `dureading_reader_auth_${hashes.join("_").slice(0, 32)}`;
 }
 
 function isUnlocked() {
@@ -482,7 +483,17 @@ async function loadChapter(chapterIndex) {
 
 async function unlockWithPassword(password) {
   const hash = await sha256Hex(password);
-  return hash === state.manifest.reader_password_hash;
+  return passwordHashes().includes(hash);
+}
+
+function passwordHashes() {
+  const hashes = Array.isArray(state.manifest?.reader_password_hashes)
+    ? state.manifest.reader_password_hashes
+    : [];
+  if (state.manifest?.reader_password_hash) {
+    hashes.push(state.manifest.reader_password_hash);
+  }
+  return [...new Set(hashes.filter(Boolean))];
 }
 
 els.loginForm.addEventListener("submit", async (event) => {
@@ -556,6 +567,21 @@ def password_hash(password: str) -> str:
     return hashlib.sha256(password.encode("utf-8")).hexdigest()
 
 
+def normalize_password_hashes(*, password_hashes: Sequence[str], password_hash_value: str = "") -> List[str]:
+    hashes: List[str] = []
+    for value in [password_hash_value, *password_hashes]:
+        clean = value.strip().lower()
+        if not clean:
+            continue
+        if len(clean) != 64 or any(ch not in "0123456789abcdef" for ch in clean):
+            raise ValueError(f"invalid reader password hash: {value}")
+        if clean not in hashes:
+            hashes.append(clean)
+    if not hashes:
+        raise ValueError("at least one reader password hash is required")
+    return hashes
+
+
 def _ranges_from_alignment(alignment: Dict[str, Any], zh_len: int, en_len: int) -> List[List[int]]:
     sync_map = [int(item) for item in alignment.get("local_sync_map", [])]
     ranges: List[List[int]] = []
@@ -582,9 +608,14 @@ def export_reader_site(
     *,
     project_id: int,
     out_dir: Path,
-    reader_password_hash: str,
+    reader_password_hash: str = "",
+    reader_password_hashes: Sequence[str] = (),
     storage_root: Path | str = "storage",
 ) -> Dict[str, Any]:
+    password_hashes = normalize_password_hashes(
+        password_hash_value=reader_password_hash,
+        password_hashes=reader_password_hashes,
+    )
     store = DuReadingStore(storage_root)
     overview = store.build_project_overview(project_id)
     project = overview["project"]
@@ -648,7 +679,8 @@ def export_reader_site(
         "project_id": project_id,
         "project_title": f"{project.get('zh_title', '')} ↔ {project.get('en_title', '')}",
         "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
-        "reader_password_hash": reader_password_hash,
+        "reader_password_hash": password_hashes[0],
+        "reader_password_hashes": password_hashes,
         "chapters": manifest_chapters,
     }
     (out_dir / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -663,16 +695,18 @@ def main() -> int:
     parser.add_argument("--project-id", type=int, required=True)
     parser.add_argument("--out", type=Path, default=Path("dist-reader"))
     parser.add_argument("--storage-root", type=Path, default=Path("storage"))
-    password_group = parser.add_mutually_exclusive_group(required=True)
-    password_group.add_argument("--reader-password", help="Plain reader password; only its SHA-256 hash is exported.")
-    password_group.add_argument("--reader-password-hash", help="Precomputed SHA-256 reader password hash.")
+    parser.add_argument("--reader-password", action="append", default=[], help="Plain reader password; only its SHA-256 hash is exported. Can be repeated.")
+    parser.add_argument("--reader-password-hash", action="append", default=[], help="Precomputed SHA-256 reader password hash. Can be repeated.")
     args = parser.parse_args()
 
-    hash_value = args.reader_password_hash or password_hash(args.reader_password or "")
+    hash_values = [password_hash(password) for password in args.reader_password]
+    hash_values.extend(args.reader_password_hash)
+    if not hash_values:
+        parser.error("provide at least one --reader-password or --reader-password-hash")
     manifest = export_reader_site(
         project_id=args.project_id,
         out_dir=args.out,
-        reader_password_hash=hash_value,
+        reader_password_hashes=hash_values,
         storage_root=args.storage_root,
     )
     print(f"Exported {len(manifest['chapters'])} readable chapters to {args.out}")

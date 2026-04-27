@@ -1,10 +1,10 @@
 # DuReading
 
-DuReading V2 is a local bilingual reading workspace for pairing Chinese translations with English source EPUBs.
+DuReading V2 is a local bilingual reading workspace for pairing Chinese translations with English source books.
 
 The product is reader-first:
 
-- `Library`: upload and reuse multiple EPUBs.
+- `Library`: upload and reuse multiple EPUB books.
 - `Project`: pair one Chinese book with one English book.
 - `Read mode`: fast chapter reading from stored alignment only; no AI calls while reading.
 - `Alignment mode`: chapter mapping, chapter alignment, block anchors, mismatch reports, confirm/skip/regenerate.
@@ -59,7 +59,7 @@ Security note: the current app is intended for local use and does not implement 
 V2 persists state locally with SQLite plus files:
 
 - `storage/app.db`: book/project/mapping/alignment/anchor/job metadata.
-- `storage/books/{book_id}/source.epub`: uploaded EPUB.
+- `storage/books/{book_id}/source.epub`: uploaded source file.
 - `storage/books/{book_id}/paragraphs.json`: parsed paragraph artifact.
 - `storage/books/{book_id}/chapters.json`: parsed chapter artifact.
 - `storage/projects/{project_id}/`: optional project artifacts/debug snapshots.
@@ -91,7 +91,25 @@ Logs are intentionally split:
 - `log/llm_debug.log`: full prompt/response records, only when `DUREADING_LLM_DEBUG=1`.
 - `log/server_events.log`: JSONL server events such as alignment decisions, cache hits, job progress, rate-limit fallback.
 
-`server_events.log` does not contain full prompts or EPUB text by design.
+`server_events.log` does not contain full prompts or source book text by design.
+
+## EPUB Import And PDF Conversion
+
+The web app accepts EPUB uploads only. EPUB import keeps using the existing structure-first parser and writes normalized `paragraphs.json` and `chapters.json`, so alignment and Reader mode reuse the same data path.
+
+For PDFs, use the one-time local PDF-to-EPUB tooling first, then upload the generated EPUB:
+
+```bash
+python3 pdf_to_epub_ocr.py data/CnVIllette.pdf \
+  --language zh \
+  --title 维莱特 \
+  --out data/CnVillette.ocr.epub \
+  --work-dir tmp_books/CnVillette_ocr \
+  --ocr-lang chi_sim+chi_tra+eng \
+  --scale 1.0
+```
+
+The tool writes a standard EPUB plus `tmp_books/.../ocr_pages.jsonl`, `parse_report.json`, and `preview.md`. It resumes from the page cache by default, so a long OCR run does not need to restart from page 1. Upload the generated EPUB through the normal library flow after checking the preview.
 
 ## Tests
 
@@ -115,6 +133,8 @@ Important tests:
 - `tests/test_middlemarch_ch1_alignment.py`: fixed Middlemarch chapter-1 block alignment regression.
 - `tests/test_hybrid_alignment_policy.py`: `llm_policy`, hard-anchor, missing-key behavior.
 - `tests/test_epub_footnotes.py`: EPUB footnote filtering regression.
+- `tests/test_pdf_upload_rejected.py`: direct PDF upload is rejected; PDFs must be converted to EPUB first.
+- `tests/test_pdf_to_epub_ocr.py`: local PDF-to-EPUB tooling and resume cache behavior.
 - `tests/frontend_logic.test.js`: frontend range/highlight/source-label logic.
 
 LLM integration tests skip when no API key/network is available.
@@ -127,13 +147,24 @@ Keep Align local, then export a reader-only static site:
 DUREADING_READER_PASSWORD="shared-reader-password" ./publish_reader.sh PROJECT_ID
 ```
 
-This writes `dist-reader/` with only static reader assets and readable chapter JSON. Draft and confirmed chapters are exported; missing/skipped chapters are not. It does not include Align Mode, Library, EPUB files, SQLite, logs, jobs, anchors, or LLM debug data.
+You can allow more than one password, for example one private password and one simpler friend password:
+
+```bash
+DUREADING_READER_PASSWORDS="my-private-password,friend-simple-password" ./publish_reader.sh PROJECT_ID
+```
+
+This writes `dist-reader/` with only static reader assets and readable chapter JSON. Draft and confirmed chapters are exported; missing/skipped chapters are not. It does not include Align Mode, Library, source EPUB files, SQLite, logs, jobs, anchors, or LLM debug data.
 
 To update an existing Reader deployment without changing the reader password, reuse the current exported password hash:
 
 ```bash
-HASH="$(python3 -c 'import json; print(json.load(open("dist-reader/manifest.json"))["reader_password_hash"])')"
-python3 export_reader_site.py --project-id PROJECT_ID --out dist-reader --reader-password-hash "$HASH"
+python3 - <<'PY' > /tmp/dureading_reader_hash_args.txt
+import json
+manifest = json.load(open("dist-reader/manifest.json"))
+for item in manifest.get("reader_password_hashes") or [manifest["reader_password_hash"]]:
+    print("--reader-password-hash", item)
+PY
+python3 export_reader_site.py --project-id PROJECT_ID --out dist-reader $(cat /tmp/dureading_reader_hash_args.txt)
 vercel deploy dist-reader --prod
 ```
 

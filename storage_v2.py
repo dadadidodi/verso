@@ -9,7 +9,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
-from chapter_catalog import PARSER_VERSION, extract_epub_document_from_bytes
+from document_parser import (
+    DocumentParseResult,
+    chapter_from_dict,
+    chapter_to_dict,
+    extract_document_from_bytes,
+    parser_version_for_format,
+    source_filename_for_format,
+)
 
 
 def utc_now() -> str:
@@ -86,6 +93,8 @@ class DuReadingStore:
                     source_filename TEXT NOT NULL,
                     content_hash TEXT NOT NULL UNIQUE,
                     epub_path TEXT NOT NULL,
+                    source_format TEXT NOT NULL DEFAULT 'epub',
+                    source_path TEXT NOT NULL DEFAULT '',
                     created_at TEXT NOT NULL
                 );
 
@@ -97,6 +106,8 @@ class DuReadingStore:
                     paragraph_count INTEGER NOT NULL,
                     char_total INTEGER NOT NULL,
                     parser_version TEXT NOT NULL DEFAULT '',
+                    parse_warnings_json TEXT NOT NULL DEFAULT '[]',
+                    quality_stats_json TEXT NOT NULL DEFAULT '{}',
                     FOREIGN KEY(book_id) REFERENCES books(id) ON DELETE CASCADE
                 );
 
@@ -174,12 +185,31 @@ class DuReadingStore:
                 );
                 """
             )
+            book_columns = {
+                row["name"]
+                for row in conn.execute("PRAGMA table_info(books)").fetchall()
+            }
+            if "source_format" not in book_columns:
+                conn.execute("ALTER TABLE books ADD COLUMN source_format TEXT NOT NULL DEFAULT 'epub'")
+            if "source_path" not in book_columns:
+                conn.execute("ALTER TABLE books ADD COLUMN source_path TEXT NOT NULL DEFAULT ''")
+            conn.execute(
+                """
+                UPDATE books
+                SET source_format = COALESCE(NULLIF(source_format, ''), 'epub'),
+                    source_path = COALESCE(NULLIF(source_path, ''), epub_path)
+                """
+            )
             columns = {
                 row["name"]
                 for row in conn.execute("PRAGMA table_info(book_artifacts)").fetchall()
             }
             if "parser_version" not in columns:
                 conn.execute("ALTER TABLE book_artifacts ADD COLUMN parser_version TEXT NOT NULL DEFAULT ''")
+            if "parse_warnings_json" not in columns:
+                conn.execute("ALTER TABLE book_artifacts ADD COLUMN parse_warnings_json TEXT NOT NULL DEFAULT '[]'")
+            if "quality_stats_json" not in columns:
+                conn.execute("ALTER TABLE book_artifacts ADD COLUMN quality_stats_json TEXT NOT NULL DEFAULT '{}'")
             anchor_columns = {
                 row["name"]
                 for row in conn.execute("PRAGMA table_info(anchors)").fetchall()
@@ -215,31 +245,45 @@ class DuReadingStore:
     def _row_to_dict(self, row: sqlite3.Row | None) -> Dict[str, Any] | None:
         return None if row is None else dict(row)
 
-    def _refresh_book_artifacts(self, conn: sqlite3.Connection, *, book_id: int, data: bytes) -> None:
-        paragraphs, chapters = extract_epub_document_from_bytes(data)
+    def _write_book_artifacts(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        book_id: int,
+        filename: str,
+        data: bytes,
+        parsed: DocumentParseResult,
+    ) -> None:
+        paragraphs = parsed.paragraphs
+        chapters = parsed.chapters
         book_dir = self._book_dir(book_id)
-        epub_path = book_dir / "source.epub"
+        source_path = book_dir / source_filename_for_format(parsed.source_format)
         paras_path = book_dir / "paragraphs.json"
         chapters_path = book_dir / "chapters.json"
-        epub_path.write_bytes(data)
+        source_path.write_bytes(data)
         paras_path.write_text(json.dumps(paragraphs, ensure_ascii=False, indent=2), encoding="utf-8")
         chapters_path.write_text(
             json.dumps(
-                [
-                    {"title": c.title, "path": c.path, "start": c.start, "end": c.end}
-                    for c in chapters
-                ],
+                [chapter_to_dict(c) for c in chapters],
                 ensure_ascii=False,
                 indent=2,
             ),
             encoding="utf-8",
         )
-        conn.execute("UPDATE books SET epub_path = ? WHERE id = ?", (str(epub_path), book_id))
+        epub_path_value = str(source_path) if parsed.source_format == "epub" else ""
+        conn.execute(
+            """
+            UPDATE books
+            SET source_filename = ?, epub_path = ?, source_format = ?, source_path = ?
+            WHERE id = ?
+            """,
+            (filename, epub_path_value, parsed.source_format, str(source_path), book_id),
+        )
         conn.execute(
             """
             UPDATE book_artifacts
             SET paragraphs_path = ?, chapters_path = ?, chapter_count = ?, paragraph_count = ?,
-                char_total = ?, parser_version = ?
+                char_total = ?, parser_version = ?, parse_warnings_json = ?, quality_stats_json = ?
             WHERE book_id = ?
             """,
             (
@@ -248,17 +292,46 @@ class DuReadingStore:
                 len(chapters),
                 len(paragraphs),
                 sum(len(p) for p in paragraphs),
-                PARSER_VERSION,
+                parsed.parser_version,
+                json.dumps(parsed.parse_warnings, ensure_ascii=False),
+                json.dumps(parsed.quality_stats, ensure_ascii=False),
                 book_id,
             ),
         )
 
-    def create_or_get_book(self, *, language: str, filename: str, data: bytes) -> Dict[str, Any]:
+    def _refresh_book_artifacts(self, conn: sqlite3.Connection, *, book_id: int, data: bytes, book: Dict[str, Any]) -> None:
+        parsed = extract_document_from_bytes(
+            data,
+            filename=str(book.get("source_filename") or source_filename_for_format(str(book.get("source_format") or "epub"))),
+            content_type="",
+            language=str(book.get("language") or ""),
+        )
+        self._write_book_artifacts(
+            conn,
+            book_id=book_id,
+            filename=str(book.get("source_filename") or source_filename_for_format(parsed.source_format)),
+            data=data,
+            parsed=parsed,
+        )
+
+    def create_or_get_book_from_parsed(
+        self,
+        *,
+        language: str,
+        filename: str,
+        data: bytes,
+        parsed: DocumentParseResult,
+    ) -> Dict[str, Any]:
+        if not parsed.paragraphs:
+            raise ValueError("no readable paragraphs extracted")
+        if not parsed.chapters:
+            raise ValueError("no readable chapters extracted")
         content_hash = sha256_bytes(data)
         with self._connect() as conn:
             row = conn.execute(
                 """
-                SELECT b.*, a.chapter_count, a.paragraph_count, a.char_total, a.parser_version
+                SELECT b.*, a.chapter_count, a.paragraph_count, a.char_total, a.parser_version,
+                       a.parse_warnings_json, a.quality_stats_json
                 FROM books b
                 JOIN book_artifacts a ON a.book_id = b.id
                 WHERE b.content_hash = ?
@@ -267,13 +340,14 @@ class DuReadingStore:
             ).fetchone()
             if row is not None:
                 existing = dict(row)
-                if existing.get("parser_version") == PARSER_VERSION:
+                if existing.get("parser_version") == parsed.parser_version:
                     return existing
                 book_id = int(existing["id"])
-                self._refresh_book_artifacts(conn, book_id=book_id, data=data)
+                self._write_book_artifacts(conn, book_id=book_id, filename=filename, data=data, parsed=parsed)
                 refreshed = conn.execute(
                     """
-                    SELECT b.*, a.chapter_count, a.paragraph_count, a.char_total, a.parser_version
+                    SELECT b.*, a.chapter_count, a.paragraph_count, a.char_total, a.parser_version,
+                           a.parse_warnings_json, a.quality_stats_json
                     FROM books b
                     JOIN book_artifacts a ON a.book_id = b.id
                     WHERE b.id = ?
@@ -282,56 +356,42 @@ class DuReadingStore:
                 ).fetchone()
                 return dict(refreshed) if refreshed is not None else existing
 
-        paragraphs, chapters = extract_epub_document_from_bytes(data)
         title = Path(filename).stem or f"{language.upper()} Book"
         now = utc_now()
         with self._connect() as conn:
             cur = conn.execute(
                 """
-                INSERT INTO books(language, title, source_filename, content_hash, epub_path, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO books(language, title, source_filename, content_hash, epub_path, source_format, source_path, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (language, title, filename, content_hash, "", now),
+                (language, title, filename, content_hash, "", parsed.source_format, "", now),
             )
             book_id = int(cur.lastrowid)
-            book_dir = self._book_dir(book_id)
-            epub_path = book_dir / "source.epub"
-            paras_path = book_dir / "paragraphs.json"
-            chapters_path = book_dir / "chapters.json"
-            epub_path.write_bytes(data)
-            paras_path.write_text(json.dumps(paragraphs, ensure_ascii=False, indent=2), encoding="utf-8")
-            chapters_path.write_text(
-                json.dumps(
-                    [
-                        {"title": c.title, "path": c.path, "start": c.start, "end": c.end}
-                        for c in chapters
-                    ],
-                    ensure_ascii=False,
-                    indent=2,
-                ),
-                encoding="utf-8",
-            )
-            conn.execute("UPDATE books SET epub_path = ? WHERE id = ?", (str(epub_path), book_id))
+            self._write_book_artifacts(conn, book_id=book_id, filename=filename, data=data, parsed=parsed)
             conn.execute(
                 """
                 INSERT INTO book_artifacts(
-                    book_id, paragraphs_path, chapters_path, chapter_count, paragraph_count, char_total, parser_version
+                    book_id, paragraphs_path, chapters_path, chapter_count, paragraph_count, char_total,
+                    parser_version, parse_warnings_json, quality_stats_json
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     book_id,
-                    str(paras_path),
-                    str(chapters_path),
-                    len(chapters),
-                    len(paragraphs),
-                    sum(len(p) for p in paragraphs),
-                    PARSER_VERSION,
+                    str(self._book_dir(book_id) / "paragraphs.json"),
+                    str(self._book_dir(book_id) / "chapters.json"),
+                    len(parsed.chapters),
+                    len(parsed.paragraphs),
+                    sum(len(p) for p in parsed.paragraphs),
+                    parsed.parser_version,
+                    json.dumps(parsed.parse_warnings, ensure_ascii=False),
+                    json.dumps(parsed.quality_stats, ensure_ascii=False),
                 ),
             )
             row = conn.execute(
                 """
-                SELECT b.*, a.chapter_count, a.paragraph_count, a.char_total, a.parser_version
+                SELECT b.*, a.chapter_count, a.paragraph_count, a.char_total, a.parser_version,
+                       a.parse_warnings_json, a.quality_stats_json
                 FROM books b
                 JOIN book_artifacts a ON a.book_id = b.id
                 WHERE b.id = ?
@@ -340,11 +400,28 @@ class DuReadingStore:
             ).fetchone()
             return dict(row) if row is not None else {}
 
+    def create_or_get_book(
+        self,
+        *,
+        language: str,
+        filename: str,
+        data: bytes,
+        content_type: str = "",
+    ) -> Dict[str, Any]:
+        parsed = extract_document_from_bytes(data, filename=filename, content_type=content_type, language=language)
+        return self.create_or_get_book_from_parsed(
+            language=language,
+            filename=filename,
+            data=data,
+            parsed=parsed,
+        )
+
     def list_books(self) -> List[Dict[str, Any]]:
         with self._connect() as conn:
             rows = conn.execute(
                 """
-                SELECT b.*, a.chapter_count, a.paragraph_count, a.char_total, a.parser_version
+                SELECT b.*, a.chapter_count, a.paragraph_count, a.char_total, a.parser_version,
+                       a.parse_warnings_json, a.quality_stats_json
                 FROM books b
                 JOIN book_artifacts a ON a.book_id = b.id
                 ORDER BY b.id DESC
@@ -357,7 +434,7 @@ class DuReadingStore:
             row = conn.execute(
                 """
                 SELECT b.*, a.chapter_count, a.paragraph_count, a.char_total, a.parser_version,
-                       a.paragraphs_path, a.chapters_path
+                       a.paragraphs_path, a.chapters_path, a.parse_warnings_json, a.quality_stats_json
                 FROM books b
                 JOIN book_artifacts a ON a.book_id = b.id
                 WHERE b.id = ?
@@ -393,11 +470,13 @@ class DuReadingStore:
 
     def load_book_document(self, book_id: int) -> Tuple[List[str], List[Dict[str, Any]]]:
         book = self.get_book(book_id)
-        if book.get("parser_version") != PARSER_VERSION:
-            epub_path = Path(book["epub_path"])
-            if epub_path.exists():
+        source_format = str(book.get("source_format") or "epub")
+        expected_parser_version = parser_version_for_format(source_format)
+        if book.get("parser_version") != expected_parser_version:
+            source_path = Path(book.get("source_path") or book.get("epub_path") or "")
+            if source_path.exists():
                 with self._connect() as conn:
-                    self._refresh_book_artifacts(conn, book_id=book_id, data=epub_path.read_bytes())
+                    self._refresh_book_artifacts(conn, book_id=book_id, data=source_path.read_bytes(), book=book)
                 book = self.get_book(book_id)
         paragraphs = json.loads(Path(book["paragraphs_path"]).read_text(encoding="utf-8"))
         chapters = json.loads(Path(book["chapters_path"]).read_text(encoding="utf-8"))

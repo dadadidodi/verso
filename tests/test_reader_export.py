@@ -103,10 +103,12 @@ def test_export_reader_site_exports_draft_and_confirmed_safe_payload(tmp_path: P
         project_id=project_id,
         out_dir=out_dir,
         reader_password_hash=password_hash("reader-pass"),
+        reader_password_hashes=[password_hash("friend-pass")],
         storage_root=tmp_path / "storage",
     )
 
     assert manifest["reader_password_hash"] == password_hash("reader-pass")
+    assert manifest["reader_password_hashes"] == [password_hash("reader-pass"), password_hash("friend-pass")]
     assert [item["chapter_index"] for item in manifest["chapters"]] == [3, 4]
     assert [item["alignment_state"] for item in manifest["chapters"]] == ["confirmed", "draft"]
     assert (out_dir / "index.html").exists()
@@ -138,6 +140,10 @@ def test_export_reader_site_exports_draft_and_confirmed_safe_payload(tmp_path: P
     assert "上传到书库" not in exported_text
     assert "Alignment Mode" not in exported_text
     assert "创建 anchor" not in exported_text
+    reader_js = (out_dir / "reader.js").read_text(encoding="utf-8")
+    assert "reader_password_hashes" in reader_js
+    exported_manifest = json.loads((out_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert exported_manifest["reader_password_hashes"] == [password_hash("reader-pass"), password_hash("friend-pass")]
 
 
 def test_export_reader_site_skips_missing_and_skipped_chapters(tmp_path: Path) -> None:
