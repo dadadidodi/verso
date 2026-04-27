@@ -141,7 +141,13 @@ def test_export_reader_site_exports_draft_and_confirmed_safe_payload(tmp_path: P
     assert "Alignment Mode" not in exported_text
     assert "创建 anchor" not in exported_text
     reader_js = (out_dir / "reader.js").read_text(encoding="utf-8")
+    reader_css = (out_dir / "reader.css").read_text(encoding="utf-8")
     assert "reader_password_hashes" in reader_js
+    assert "lookup-close-btn" in reader_js
+    assert "setLookupOpen" in reader_js
+    assert "@media (max-width: 760px)" in reader_css
+    assert "bottom: 0" in reader_css
+    assert ".lookup-panel.is-open" in reader_css
     exported_manifest = json.loads((out_dir / "manifest.json").read_text(encoding="utf-8"))
     assert exported_manifest["reader_password_hashes"] == [password_hash("reader-pass"), password_hash("friend-pass")]
 

@@ -60,8 +60,10 @@ const els = {
   readerTitle: document.getElementById("reader-title"),
   readerMeta: document.getElementById("reader-meta"),
   lookupPanel: document.getElementById("lookup-panel"),
+  lookupColumn: document.querySelector(".lookup-column"),
   lookupLabel: document.getElementById("lookup-label"),
   lookupContent: document.getElementById("lookup-content"),
+  lookupCloseBtn: document.getElementById("lookup-close-btn"),
   zhScroll: document.getElementById("zh-scroll"),
   enScroll: document.getElementById("en-scroll"),
 };
@@ -104,6 +106,7 @@ const state = {
   mappingCollapsed: false,
   anchorFloatCollapsed: false,
   alignBusy: false,
+  lookupOpen: false,
 };
 
 function isMappingConfirmed() {
@@ -556,6 +559,8 @@ function finishAlignProgress(message) {
 
 function updateModeUI() {
   const align = state.mode === "align";
+  document.body.classList.toggle("mode-read", state.mode === "read");
+  document.body.classList.toggle("mode-align", align);
   els.modeReadBtn.classList.toggle("active", state.mode === "read");
   els.modeAlignBtn.classList.toggle("active", align);
   els.mappingPanel.classList.toggle("hidden", !align);
@@ -566,6 +571,21 @@ function updateModeUI() {
   state.pendingZhAnchor = null;
   state.anchorDraft = { zhStart: null, zhEnd: null, enStart: null, enEnd: null };
   updateAnchorHint();
+}
+
+function setLookupOpen(open) {
+  state.lookupOpen = Boolean(open);
+  if (els.lookupPanel) {
+    els.lookupPanel.classList.toggle("is-open", state.lookupOpen);
+  }
+  if (els.lookupColumn) {
+    els.lookupColumn.classList.toggle("is-open", state.lookupOpen);
+  }
+  document.body.classList.toggle("reader-lookup-open", state.lookupOpen && state.mode === "read");
+}
+
+function isMobileReaderLayout() {
+  return window.matchMedia("(max-width: 760px)").matches;
 }
 
 function updateAnchorFloatUI() {
@@ -680,6 +700,7 @@ function renderLookupPanel() {
   const reader = state.currentReader;
   if (!reader) {
     els.lookupPanel.classList.add("hidden");
+    setLookupOpen(false);
     return;
   }
   els.lookupPanel.classList.remove("hidden");
@@ -690,6 +711,7 @@ function renderLookupPanel() {
     if (els.reportMismatchBtn) {
       els.reportMismatchBtn.classList.add("hidden");
     }
+    setLookupOpen(false);
     return;
   }
   if (els.reportMismatchBtn) {
@@ -715,10 +737,14 @@ function renderLookupPanel() {
     }
   }
   els.lookupContent.innerHTML = lines.join("") || `<p class="muted">当前中文段暂无英文对应。</p>`;
+  setLookupOpen(true);
   window.requestAnimationFrame(() => alignLookupToChinese());
 }
 
 function alignLookupToChinese() {
+  if (state.mode === "read" && isMobileReaderLayout()) {
+    return;
+  }
   if (state.activeZhIndex === null || !els.lookupPanel || !els.lookupContent) {
     return;
   }
@@ -757,6 +783,7 @@ function renderReader() {
     state.enReverseMap = new Map();
     state.activeZhIndex = null;
     state.activeEnRange = null;
+    setLookupOpen(false);
     renderLookupPanel();
     return;
   }
@@ -864,6 +891,7 @@ async function loadProject(projectId) {
   state.currentProjectId = Number(projectId);
   state.activeZhIndex = null;
   state.activeEnRange = null;
+  setLookupOpen(false);
   const [overview, mappingPayload, jobsPayload] = await Promise.all([
     api(`/api/projects/${projectId}`),
     api(`/api/projects/${projectId}/chapter-mapping`),
@@ -904,6 +932,7 @@ async function loadCurrentChapter() {
   }
   state.activeZhIndex = null;
   state.activeEnRange = null;
+  setLookupOpen(false);
   try {
     if (state.mode === "read") {
       state.currentReader = await api(`/api/projects/${state.currentProjectId}/reader/chapters/${state.currentChapterIndex}`);
@@ -1062,6 +1091,7 @@ async function deleteBook(bookId) {
     state.pendingZhAnchor = null;
     state.activeZhIndex = null;
     state.activeEnRange = null;
+    setLookupOpen(false);
   }
   await refreshLibrary();
   renderProjectSummary();
@@ -1278,6 +1308,7 @@ function moveChapter(delta) {
   state.currentChapterIndex = nextIndex;
   state.activeZhIndex = null;
   state.activeEnRange = null;
+  setLookupOpen(false);
   renderChapterList();
   loadCurrentChapter();
 }
@@ -1426,6 +1457,10 @@ els.reportMismatchBtn?.addEventListener("click", () => {
   reportMismatch().catch((error) => {
     setStatus(error instanceof Error ? error.message : "报告 mismatch 失败。", true);
   });
+});
+
+els.lookupCloseBtn?.addEventListener("click", () => {
+  setLookupOpen(false);
 });
 
 els.anchorList.addEventListener("click", (event) => {

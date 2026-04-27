@@ -56,7 +56,10 @@ READER_INDEX_HTML = """<!doctype html>
         <aside class="lookup-panel">
           <div class="lookup-header">
             <h2>原文</h2>
-            <span id="lookup-label" class="tag">EN</span>
+            <div class="lookup-actions">
+              <span id="lookup-label" class="tag">EN</span>
+              <button id="lookup-close-btn" type="button" class="secondary-btn lookup-close-btn">关闭</button>
+            </div>
           </div>
           <div id="lookup-content" class="scroll-panel lookup-content">
             <p class="muted">点击中文段落查看对应英文原文。</p>
@@ -271,6 +274,19 @@ button:hover {
   gap: 12px;
 }
 
+.lookup-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lookup-close-btn {
+  display: none;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
 .tag {
   display: inline-flex;
   border: 1px solid var(--warm);
@@ -322,6 +338,98 @@ button:hover {
     align-items: stretch;
   }
 }
+
+@media (max-width: 760px) {
+  .shell {
+    padding: 10px;
+  }
+
+  .reader-header {
+    padding: 12px;
+  }
+
+  .reader-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .chapter-panel,
+  .zh-panel {
+    padding: 12px;
+    border-radius: 14px;
+  }
+
+  .chapter-list {
+    display: flex;
+    gap: 8px;
+    min-height: 0;
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 4px;
+    scroll-snap-type: x proximity;
+  }
+
+  .chapter-btn {
+    flex: 0 0 min(220px, 72vw);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    scroll-snap-align: start;
+  }
+
+  .scroll-panel {
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
+  }
+
+  #zh-content {
+    padding: 10px 4px 82px;
+    border: 0;
+    background: transparent;
+  }
+
+  .para {
+    font-size: 18px;
+    line-height: 1.76;
+    padding: 10px 11px;
+    margin-bottom: 12px;
+  }
+
+  .lookup-close-btn {
+    display: inline-flex;
+  }
+
+  .lookup-panel {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    max-height: 58vh;
+    padding: 12px 14px 18px;
+    border-radius: 18px 18px 0 0;
+    background: rgba(249, 246, 239, 0.98);
+    box-shadow: 0 -18px 48px rgba(41, 42, 34, 0.22);
+    transform: translateY(calc(100% + 20px));
+    transition: transform 180ms ease;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .lookup-panel.is-open {
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  .lookup-content {
+    max-height: calc(58vh - 68px);
+    overflow: auto;
+    padding: 12px 12px 18px;
+  }
+}
 """
 
 
@@ -330,6 +438,7 @@ READER_JS = """const state = {
   currentChapter: null,
   currentChapterIndex: null,
   activeZhIndex: null,
+  lookupOpen: false,
 };
 
 const els = {
@@ -343,8 +452,10 @@ const els = {
   chapterList: document.getElementById("chapter-list"),
   chapterTitle: document.getElementById("chapter-title"),
   zhContent: document.getElementById("zh-content"),
+  lookupPanel: document.querySelector(".lookup-panel"),
   lookupLabel: document.getElementById("lookup-label"),
   lookupContent: document.getElementById("lookup-content"),
+  lookupCloseBtn: document.getElementById("lookup-close-btn"),
   lockBtn: document.getElementById("lock-btn"),
 };
 
@@ -392,6 +503,11 @@ function showReader() {
   els.readerApp.classList.remove("hidden");
 }
 
+function setLookupOpen(open) {
+  state.lookupOpen = Boolean(open);
+  els.lookupPanel?.classList.toggle("is-open", state.lookupOpen);
+}
+
 function englishRangeForZh(chapter, zhIndex) {
   const raw = Array.isArray(chapter.en_ranges_by_zh) ? chapter.en_ranges_by_zh[zhIndex] : null;
   if (Array.isArray(raw) && raw.length >= 2) {
@@ -434,6 +550,7 @@ function renderLookup(range) {
   if (!chapter || !range) {
     els.lookupLabel.textContent = "EN";
     els.lookupContent.innerHTML = `<p class="muted">点击中文段落查看对应英文原文。</p>`;
+    setLookupOpen(false);
     return;
   }
   els.lookupLabel.textContent = formatEnglishRange(range);
@@ -448,6 +565,7 @@ function renderLookup(range) {
     lines.push(`<p class="lookup-para${active}"><span class="lookup-index">EN ${enIndex + 1}</span>${escapeHtml(text)}</p>`);
   }
   els.lookupContent.innerHTML = lines.join("") || `<p class="muted">当前中文段暂无英文对应。</p>`;
+  setLookupOpen(true);
 }
 
 function renderChapter() {
@@ -478,6 +596,7 @@ async function loadChapter(chapterIndex) {
   state.currentChapter = await response.json();
   state.currentChapterIndex = chapterIndex;
   state.activeZhIndex = null;
+  setLookupOpen(false);
   renderChapter();
 }
 
@@ -513,6 +632,7 @@ els.lockBtn.addEventListener("click", () => {
   setUnlocked(false);
   state.currentChapter = null;
   state.currentChapterIndex = null;
+  setLookupOpen(false);
   showLogin();
 });
 
@@ -536,6 +656,10 @@ els.zhContent.addEventListener("click", (event) => {
   els.zhContent.querySelectorAll(".para.active").forEach((el) => el.classList.remove("active"));
   para.classList.add("active");
   renderLookup(englishRangeForZh(state.currentChapter, zhIndex));
+});
+
+els.lookupCloseBtn?.addEventListener("click", () => {
+  setLookupOpen(false);
 });
 
 async function boot() {

@@ -675,6 +675,18 @@ select {
   align-items: center;
 }
 
+.lookup-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.lookup-close-btn {
+  display: none;
+}
+
 .lookup-content {
   display: grid;
   gap: 8px;
@@ -848,6 +860,159 @@ select {
 
   .mapping-collapsed-meta {
     justify-content: flex-start;
+  }
+}
+
+@media (max-width: 760px) {
+  :root {
+    --reader-min-height: 0;
+  }
+
+  body.mode-read {
+    background: linear-gradient(180deg, #f4f1e8 0%, #eef1eb 100%);
+  }
+
+  body.mode-read .hero {
+    position: static;
+    padding: 10px 12px;
+  }
+
+  body.mode-read .layout {
+    padding: 8px;
+  }
+
+  body.mode-read .workspace-header,
+  body.mode-read .reader-panel {
+    border-radius: 14px;
+  }
+
+  body.mode-read .workspace-grid,
+  body.mode-read .reader-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  body.mode-read .chapter-pane {
+    display: block;
+    height: auto;
+    min-height: 0;
+    padding: 10px;
+  }
+
+  body.mode-read .chapter-pane .pane-header {
+    margin-bottom: 8px;
+  }
+
+  body.mode-read .chapter-pane .subpanel {
+    display: none;
+  }
+
+  body.mode-read .chapter-list {
+    display: flex;
+    gap: 8px;
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 4px;
+    scroll-snap-type: x proximity;
+  }
+
+  body.mode-read .chapter-card {
+    flex: 0 0 min(230px, 72vw);
+    scroll-snap-align: start;
+  }
+
+  body.mode-read .reader-panel {
+    padding: 10px;
+  }
+
+  body.mode-read .reader-column h4 {
+    margin-bottom: 6px;
+  }
+
+  body.mode-read .scroll-box {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  body.mode-read #zh-scroll {
+    padding: 12px 6px 76px;
+    border: 0;
+    background: transparent;
+  }
+
+  body.mode-read .para {
+    font-size: 18px;
+    line-height: 1.76;
+    padding: 10px 11px;
+    margin-bottom: 12px;
+  }
+
+  body.mode-read .lookup-column {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 70;
+    min-height: 0;
+    max-height: 58vh;
+    padding: 12px 14px 18px;
+    border: 1px solid rgba(47, 94, 78, 0.32);
+    border-radius: 18px 18px 0 0;
+    background: rgba(249, 246, 239, 0.98);
+    box-shadow: 0 -18px 48px rgba(41, 42, 34, 0.22);
+    transform: translateY(calc(100% + 20px));
+    transition: transform 180ms ease;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  body.mode-read .lookup-column.is-open {
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  body.mode-read .lookup-header {
+    gap: 8px;
+  }
+
+  body.mode-read .lookup-actions {
+    flex-wrap: nowrap;
+  }
+
+  body.mode-read .lookup-close-btn {
+    display: inline-flex;
+  }
+
+  body.mode-read .lookup-panel {
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    margin: 8px 0 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+    pointer-events: auto;
+    overflow: hidden;
+  }
+
+  body.mode-read .lookup-panel.is-open {
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  body.mode-read .lookup-content {
+    max-height: calc(58vh - 26px);
+    overflow: auto;
+    padding: 0 2px 18px;
+  }
+
+  body.mode-read .lookup-para {
+    font-size: 15px;
+    line-height: 1.66;
   }
 }
 

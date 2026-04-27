@@ -296,6 +296,7 @@ Reading behavior:
 
 - Chinese translation is primary.
 - Clicking a Chinese paragraph shows the matched English block plus one paragraph of context before/after.
+- On mobile-width screens, Read mode uses a bottom English lookup sheet so the Chinese text remains the main page.
 - Highlighting uses `en_ranges_by_zh`.
 - Scroll sync may continue using `local_sync_map`.
 
@@ -350,3 +351,5 @@ Publishing flow:
 When updating published content, reuse the existing `reader_password_hashes` from `dist-reader/manifest.json` if the reader passwords should stay unchanged. The legacy `reader_password_hash` field is still exported for compatibility. Vercel creates a new immutable production deployment URL each time, then moves the stable alias to the newest production deployment.
 
 The static reader can accept multiple frontend password hashes and uses `sessionStorage` after unlock. This is intentionally lightweight and not a strong security boundary; use server-side auth or Cloudflare Access later if content protection becomes important.
+
+The exported static Reader has the same mobile reading pattern as local Read mode: Chinese text is the primary natural scroll surface, and the matched English range opens in a dismissible bottom sheet below `760px` screen width. Desktop continues to use the right-side lookup panel.

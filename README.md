@@ -125,6 +125,7 @@ Run the full test suite:
 python3 -m pytest -q
 node --test tests/frontend_logic.test.js
 node --check app.js
+node --check dist-reader/reader.js
 ```
 
 Important tests:
@@ -154,6 +155,8 @@ DUREADING_READER_PASSWORDS="my-private-password,friend-simple-password" ./publis
 ```
 
 This writes `dist-reader/` with only static reader assets and readable chapter JSON. Draft and confirmed chapters are exported; missing/skipped chapters are not. It does not include Align Mode, Library, source EPUB files, SQLite, logs, jobs, anchors, or LLM debug data.
+
+On mobile-width screens, the static Reader prioritizes the Chinese text and opens matched English text in a bottom sheet after tapping a paragraph. Desktop keeps the side-by-side lookup panel.
 
 To update an existing Reader deployment without changing the reader password, reuse the current exported password hash:
 
