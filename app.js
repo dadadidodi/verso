@@ -803,7 +803,10 @@ function renderReader() {
       .join("");
   }
   if (state.activeZhIndex !== null) {
-    setActivePair(state.activeZhIndex, { scrollEnglish: false });
+    const anchorRangeOverride = state.mode === "align" && els.anchorMode.checked && state.anchorDraft.zhStart !== null && state.anchorDraft.zhEnd !== null
+      ? state.activeEnRange
+      : null;
+    setActivePair(state.activeZhIndex, { scrollEnglish: false, rangeOverride: anchorRangeOverride });
   } else {
     renderLookupPanel();
   }
@@ -820,14 +823,31 @@ function clearActiveParagraphs() {
   els.enScroll?.querySelectorAll(".para.active").forEach((el) => el.classList.remove("active"));
 }
 
+function englishRangeForZhSpan(zhStart, zhEnd) {
+  const ranges = [];
+  for (let zhIndex = zhStart; zhIndex <= zhEnd; zhIndex += 1) {
+    const range = Logic.englishRangeForZh
+      ? Logic.englishRangeForZh(state.enRangesByZh, zhIndex, state.localSyncMap)
+      : { start: Number(state.localSyncMap[zhIndex] ?? 0), end: Number(state.localSyncMap[zhIndex] ?? 0) };
+    ranges.push(range);
+  }
+  if (!ranges.length) {
+    return null;
+  }
+  return {
+    start: Math.min(...ranges.map((range) => Number(range.start || 0))),
+    end: Math.max(...ranges.map((range) => Number(range.end ?? range.start ?? 0))),
+  };
+}
+
 function setActivePair(zhIndex, options = {}) {
   clearActiveParagraphs();
   state.activeZhIndex = zhIndex;
   const zhEl = els.zhScroll.querySelector(`.para[data-index="${zhIndex}"]`);
   zhEl?.classList.add("active");
-  const range = Logic.englishRangeForZh
+  const range = options.rangeOverride || (Logic.englishRangeForZh
     ? Logic.englishRangeForZh(state.enRangesByZh, zhIndex, state.localSyncMap)
-    : { start: Number(state.localSyncMap[zhIndex] ?? 0), end: Number(state.localSyncMap[zhIndex] ?? 0) };
+    : { start: Number(state.localSyncMap[zhIndex] ?? 0), end: Number(state.localSyncMap[zhIndex] ?? 0) });
   state.activeEnRange = range;
   if (els.enScroll) {
     for (let enIndex = range.start; enIndex <= range.end; enIndex += 1) {
@@ -1493,12 +1513,16 @@ function handleParagraphClick(event, side) {
     if (state.anchorDraft.zhStart === null || state.anchorDraft.zhEnd !== null) {
       state.anchorDraft = { zhStart: localIndex, zhEnd: null, enStart: null, enEnd: null };
       state.pendingZhAnchor = localIndex;
+      state.activeZhIndex = null;
+      state.activeEnRange = null;
     } else {
       state.anchorDraft.zhEnd = localIndex;
       const normalized = normalizeAnchorRange(state.anchorDraft.zhStart, state.anchorDraft.zhEnd);
       state.anchorDraft.zhStart = normalized.start;
       state.anchorDraft.zhEnd = normalized.end;
       state.pendingZhAnchor = normalized.start;
+      state.activeZhIndex = normalized.start;
+      state.activeEnRange = englishRangeForZhSpan(normalized.start, normalized.end);
     }
     updateAnchorHint();
     renderReader();
