@@ -9,6 +9,9 @@ tmp_test_*/
 tmp_books/
 data/*.pdf
 data/*.ocr.epub
+data/*.epub
+data/*.html
+tests/fixtures/middlemarch_*
 =1.24.0
 result.txt
 tests/fixtures/*.local.txt

@@ -164,8 +164,11 @@ rg -n "sk-[A-Za-z0-9_-]+|OPENAI_API_KEY\\s*=|Authorization: Bearer|Bearer [A-Za-
 - `log/`
 - `dist-reader/`
 - `tmp_books/`
+- `data/*.epub`
+- `data/*.html`
 - `data/*.pdf`
 - `data/*.ocr.epub`
+- `tests/fixtures/middlemarch_*`
 - `tests/fixtures/*.local.txt`
 
 提交时优先逐个文件 `git add`，不要随手 `git add .`。

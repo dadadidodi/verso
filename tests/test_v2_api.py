@@ -12,6 +12,12 @@ from web_server import create_app
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+ZH_MIDDLEMARCH_EPUB = REPO_ROOT / "data" / "CnMiddlemarch.epub"
+EN_MIDDLEMARCH_EPUB = REPO_ROOT / "data" / "EnMiddlemarch.epub"
+requires_middlemarch_epubs = pytest.mark.skipif(
+    not (ZH_MIDDLEMARCH_EPUB.exists() and EN_MIDDLEMARCH_EPUB.exists()),
+    reason="local Middlemarch EPUB fixtures are not tracked",
+)
 
 
 def _range_contains(ranges: list[list[int]], zh_index: int, en_index: int) -> bool:
@@ -20,8 +26,8 @@ def _range_contains(ranges: list[list[int]], zh_index: int, en_index: int) -> bo
 
 
 async def _upload_middlemarch_pair(client: httpx.AsyncClient) -> tuple[int, int]:
-    zh_data = (REPO_ROOT / "data" / "CnMiddlemarch.epub").read_bytes()
-    en_data = (REPO_ROOT / "data" / "EnMiddlemarch.epub").read_bytes()
+    zh_data = ZH_MIDDLEMARCH_EPUB.read_bytes()
+    en_data = EN_MIDDLEMARCH_EPUB.read_bytes()
     zh_resp = await client.post(
         "/api/books",
         data={"language": "zh"},
@@ -69,6 +75,7 @@ def test_upload_bad_epub_returns_400(tmp_path: Path) -> None:
     asyncio.run(run_flow())
 
 
+@requires_middlemarch_epubs
 def test_project_and_mapping_validation_errors_do_not_write_bad_state(tmp_path: Path) -> None:
     app = create_app(tmp_path / "storage")
 
@@ -144,6 +151,7 @@ def test_project_and_mapping_validation_errors_do_not_write_bad_state(tmp_path: 
     asyncio.run(run_flow())
 
 
+@requires_middlemarch_epubs
 def test_active_background_jobs_are_reused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     app = create_app(tmp_path / "storage")
 
@@ -197,10 +205,11 @@ def test_active_background_jobs_are_reused(tmp_path: Path, monkeypatch: pytest.M
     asyncio.run(run_flow())
 
 
+@requires_middlemarch_epubs
 def test_v2_project_flow(tmp_path: Path) -> None:
     app = create_app(tmp_path / "storage")
-    zh_data = (REPO_ROOT / "data" / "CnMiddlemarch.epub").read_bytes()
-    en_data = (REPO_ROOT / "data" / "EnMiddlemarch.epub").read_bytes()
+    zh_data = ZH_MIDDLEMARCH_EPUB.read_bytes()
+    en_data = EN_MIDDLEMARCH_EPUB.read_bytes()
 
     async def run_flow() -> None:
         transport = httpx.ASGITransport(app=app)
@@ -541,10 +550,11 @@ def test_v2_project_flow(tmp_path: Path) -> None:
     asyncio.run(run_flow())
 
 
+@requires_middlemarch_epubs
 def test_align_chapter_falls_back_when_llm_rate_limited(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     app = create_app(tmp_path / "storage")
-    zh_data = (REPO_ROOT / "data" / "CnMiddlemarch.epub").read_bytes()
-    en_data = (REPO_ROOT / "data" / "EnMiddlemarch.epub").read_bytes()
+    zh_data = ZH_MIDDLEMARCH_EPUB.read_bytes()
+    en_data = EN_MIDDLEMARCH_EPUB.read_bytes()
 
     import web_server as web_server_module
 

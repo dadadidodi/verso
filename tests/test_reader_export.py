@@ -3,11 +3,19 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from export_reader_site import export_reader_site, password_hash
 from storage_v2 import DuReadingStore
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+ZH_MIDDLEMARCH_EPUB = REPO_ROOT / "data" / "CnMiddlemarch.epub"
+EN_MIDDLEMARCH_EPUB = REPO_ROOT / "data" / "EnMiddlemarch.epub"
+requires_middlemarch_epubs = pytest.mark.skipif(
+    not (ZH_MIDDLEMARCH_EPUB.exists() and EN_MIDDLEMARCH_EPUB.exists()),
+    reason="local Middlemarch EPUB fixtures are not tracked",
+)
 
 
 def _chapter_lengths(store: DuReadingStore, project_id: int, chapter_index: int) -> tuple[int, int]:
@@ -52,17 +60,18 @@ def _save_alignment(store: DuReadingStore, project_id: int, chapter_index: int, 
     )
 
 
+@requires_middlemarch_epubs
 def test_export_reader_site_exports_draft_and_confirmed_safe_payload(tmp_path: Path) -> None:
     store = DuReadingStore(tmp_path / "storage")
     zh_book = store.create_or_get_book(
         language="zh",
         filename="CnMiddlemarch.epub",
-        data=(REPO_ROOT / "data" / "CnMiddlemarch.epub").read_bytes(),
+        data=ZH_MIDDLEMARCH_EPUB.read_bytes(),
     )
     en_book = store.create_or_get_book(
         language="en",
         filename="EnMiddlemarch.epub",
-        data=(REPO_ROOT / "data" / "EnMiddlemarch.epub").read_bytes(),
+        data=EN_MIDDLEMARCH_EPUB.read_bytes(),
     )
     project = store.create_project(
         zh_book_id=int(zh_book["id"]),
@@ -152,17 +161,18 @@ def test_export_reader_site_exports_draft_and_confirmed_safe_payload(tmp_path: P
     assert exported_manifest["reader_password_hashes"] == [password_hash("reader-pass"), password_hash("friend-pass")]
 
 
+@requires_middlemarch_epubs
 def test_export_reader_site_skips_missing_and_skipped_chapters(tmp_path: Path) -> None:
     store = DuReadingStore(tmp_path / "storage")
     zh_book = store.create_or_get_book(
         language="zh",
         filename="CnMiddlemarch.epub",
-        data=(REPO_ROOT / "data" / "CnMiddlemarch.epub").read_bytes(),
+        data=ZH_MIDDLEMARCH_EPUB.read_bytes(),
     )
     en_book = store.create_or_get_book(
         language="en",
         filename="EnMiddlemarch.epub",
-        data=(REPO_ROOT / "data" / "EnMiddlemarch.epub").read_bytes(),
+        data=EN_MIDDLEMARCH_EPUB.read_bytes(),
     )
     project = store.create_project(
         zh_book_id=int(zh_book["id"]),

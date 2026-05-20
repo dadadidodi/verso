@@ -22,6 +22,18 @@ FIXTURES_DIR = REPO_ROOT / "tests" / "fixtures"
 ZH_FIXTURE = FIXTURES_DIR / "middlemarch_ch1_zh.txt"
 EN_FIXTURE = FIXTURES_DIR / "middlemarch_ch1_en.txt"
 GOLD_FIXTURE = FIXTURES_DIR / "middlemarch_ch1_gold.json"
+MIDDLEMARCH_FILES = [
+    ZH_FIXTURE,
+    EN_FIXTURE,
+    GOLD_FIXTURE,
+    REPO_ROOT / "data" / "CnMiddlemarch.epub",
+    REPO_ROOT / "data" / "EnMiddlemarch.epub",
+]
+
+pytestmark = pytest.mark.skipif(
+    not all(path.exists() for path in MIDDLEMARCH_FILES),
+    reason="local Middlemarch fixtures are not tracked",
+)
 
 
 def _load_gold() -> dict:

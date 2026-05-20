@@ -3,11 +3,15 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from chapter_catalog import extract_epub_document_from_bytes, extract_paragraphs_from_html_text  # noqa: E402
+
+CN_MIDDLEMARCH_EPUB = REPO_ROOT / "data" / "CnMiddlemarch.epub"
 
 
 def test_extract_paragraphs_excludes_epub_footnotes_and_noterefs() -> None:
@@ -32,8 +36,9 @@ def test_extract_paragraphs_excludes_epub_footnotes_and_noterefs() -> None:
     assert not any("英国科学家" in paragraph for paragraph in paragraphs)
 
 
+@pytest.mark.skipif(not CN_MIDDLEMARCH_EPUB.exists(), reason="local Middlemarch EPUB fixture is not tracked")
 def test_middlemarch_second_chapter_does_not_extract_literary_notes_as_body() -> None:
-    paragraphs, chapters = extract_epub_document_from_bytes((REPO_ROOT / "data" / "CnMiddlemarch.epub").read_bytes())
+    paragraphs, chapters = extract_epub_document_from_bytes(CN_MIDDLEMARCH_EPUB.read_bytes())
     second_chapter = next(chapter for chapter in chapters if chapter.title == "第二章")
     chapter_paragraphs = paragraphs[second_chapter.start : second_chapter.end + 1]
 
