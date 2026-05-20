@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DuReading V2</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=ui-labels-20260519-1">
 </head>
 <body>
   <header class="hero">
@@ -14,10 +14,10 @@
       <p class="hero-copy">这要命的译文！！！</p>
     </div>
     <div class="hero-actions">
-      <button id="library-toggle-btn" type="button" class="secondary-btn">Library</button>
-      <button id="refresh-library-btn" type="button" class="secondary-btn">刷新书库</button>
-      <button id="export-project-btn" type="button" class="secondary-btn" disabled>导出项目快照</button>
-      <button id="delete-project-btn" type="button" class="secondary-btn danger-btn" disabled>删除当前项目</button>
+      <button id="library-toggle-btn" type="button" class="secondary-btn" data-full="书库与项目" data-short="书库">书库与项目</button>
+      <button id="refresh-library-btn" type="button" class="secondary-btn" data-full="刷新列表" data-short="刷新">刷新列表</button>
+      <button id="export-project-btn" type="button" class="secondary-btn" data-full="导出项目" data-short="导出" disabled>导出项目</button>
+      <button id="delete-project-btn" type="button" class="secondary-btn danger-btn" data-full="删除项目" data-short="删除" disabled>删除项目</button>
     </div>
   </header>
 
@@ -29,14 +29,14 @@
           <span>语言</span>
           <select id="book-language">
             <option value="zh">中文书</option>
-            <option value="en">English Book</option>
+            <option value="en">英文书</option>
           </select>
         </label>
         <label class="field">
           <span>EPUB 文件</span>
           <input id="book-file" type="file" accept=".epub,application/epub+zip">
         </label>
-        <button id="upload-book-btn" type="button">上传到书库</button>
+        <button id="upload-book-btn" type="button">上传这本书</button>
       </section>
 
       <section class="panel">
@@ -49,7 +49,7 @@
           <span>英文书</span>
           <select id="en-book-select"></select>
         </label>
-        <button id="create-project-btn" type="button">创建阅读项目</button>
+        <button id="create-project-btn" type="button">创建中英项目</button>
       </section>
 
       <section class="panel">
@@ -75,8 +75,8 @@
           <p id="project-summary" class="muted">从左侧选择项目，进入阅读或对齐工作区。</p>
         </div>
         <div class="mode-switch">
-          <button id="mode-read-btn" type="button" class="mode-btn active" data-mode="read">Read Mode</button>
-          <button id="mode-align-btn" type="button" class="mode-btn" data-mode="align">Alignment Mode</button>
+          <button id="mode-read-btn" type="button" class="mode-btn active" data-mode="read">阅读模式</button>
+          <button id="mode-align-btn" type="button" class="mode-btn" data-mode="align">校对模式</button>
         </div>
       </div>
 
@@ -93,8 +93,8 @@
           <div class="subpanel">
             <h4>后台任务</h4>
             <div class="tiny-actions">
-              <button id="prefetch-btn" type="button" class="secondary-btn" disabled>预取后续 2 章</button>
-              <button id="align-remaining-btn" type="button" class="secondary-btn" disabled>后台对齐剩余章节</button>
+              <button id="prefetch-btn" type="button" class="secondary-btn" disabled>预对齐后 2 章</button>
+              <button id="align-remaining-btn" type="button" class="secondary-btn" disabled>对齐剩余章节</button>
             </div>
             <div id="job-list" class="stack-list compact"></div>
           </div>
@@ -104,31 +104,31 @@
           <section id="mapping-panel" class="panel hidden">
             <div id="mapping-header" class="pane-header">
               <div class="mapping-header-copy">
-                <h3>章节映射</h3>
-                <p class="mapping-panel-detail muted">先建立中章 → 英章的项目映射（生成建议或手动选英章后，可「保存」或「确认映射」）。</p>
-                <p class="mapping-panel-detail muted workflow-hint"><strong>下一步（段落对齐）：</strong>映射就绪后，在<strong>左侧章节列表</strong>点选一章，再滚到下方「当前章节对齐」，点<strong>「对齐当前章」</strong>，才会对该章做 LLM 段落匹配。</p>
+                <h3>章节配对</h3>
+                <p class="mapping-panel-detail muted">先把中文章节配到对应的英文章节。可以用 AI 建议，也可以手动选择后保存。</p>
+                <p class="mapping-panel-detail muted workflow-hint"><strong>下一步：</strong>章节配对确认后，在左侧选一章，再点「对齐本章段落」。</p>
               </div>
               <div class="tiny-actions mapping-actions">
-                <button id="suggest-mapping-btn" type="button">生成建议</button>
-                <button id="save-mapping-btn" type="button" class="secondary-btn">保存手动调整</button>
-                <button id="confirm-mapping-btn" type="button" class="secondary-btn">确认映射</button>
-                <button id="mapping-toggle-btn" type="button" class="secondary-btn" disabled>折叠</button>
+                <button id="suggest-mapping-btn" type="button">AI 建议配对</button>
+                <button id="save-mapping-btn" type="button" class="secondary-btn">保存配对草稿</button>
+                <button id="confirm-mapping-btn" type="button" class="secondary-btn">锁定章节配对</button>
+                <button id="mapping-toggle-btn" type="button" class="secondary-btn" disabled>收起配对</button>
               </div>
             </div>
             <div id="mapping-collapsed-summary" class="mapping-collapsed-summary hidden">
               <div>
-                <p class="mapping-collapsed-title">章节映射已确认</p>
+                <p class="mapping-collapsed-title">章节配对已锁定</p>
                 <p id="mapping-collapsed-hint" class="muted">可随时展开查看和微调。</p>
               </div>
               <div id="mapping-collapsed-meta" class="mapping-collapsed-meta"></div>
-              <button id="mapping-collapsed-expand-btn" type="button" class="secondary-btn">展开</button>
+              <button id="mapping-collapsed-expand-btn" type="button" class="secondary-btn">展开配对</button>
             </div>
             <div id="mapping-content">
               <div id="mapping-progress-wrap" class="progress-wrap hidden" aria-live="polite">
                 <div class="progress-bar">
                   <div id="mapping-progress-bar" class="progress-fill"></div>
                 </div>
-                <p id="mapping-progress-text" class="muted">正在生成章节映射建议...</p>
+              <p id="mapping-progress-text" class="muted">正在生成章节配对建议...</p>
               </div>
               <div id="mapping-table" class="mapping-table"></div>
             </div>
@@ -137,49 +137,49 @@
           <section id="align-panel" class="panel hidden">
             <div class="pane-header">
               <div>
-                <h3>当前章节对齐</h3>
+                <h3>当前章段落对齐</h3>
                 <p id="align-meta" class="muted">请先选择项目与章节。</p>
-                <p class="muted workflow-hint">依赖已保存的章节映射。选中左侧某一章后按「对齐当前章」；满意后可「确认当前章」，或「后台对齐剩余章节」批量处理。</p>
+                <p class="muted workflow-hint">先确认章节配对，再对齐段落。满意后确认本章，也可以批量对齐剩余章节。</p>
               </div>
               <div class="tiny-actions">
                 <label class="inline-field">
-                  <span>策略</span>
+                  <span>AI 策略</span>
                   <select id="llm-policy-select">
                     <option value="auto" selected>自动</option>
-                    <option value="force">强制 LM</option>
-                    <option value="off">禁用 LM</option>
+                    <option value="force">强制使用 AI</option>
+                    <option value="off">不使用 AI</option>
                   </select>
                 </label>
-                <button id="align-chapter-btn" type="button">对齐当前章</button>
-                <button id="confirm-chapter-btn" type="button" class="secondary-btn">确认当前章</button>
-                <button id="skip-chapter-btn" type="button" class="secondary-btn">跳过当前章</button>
-                <button id="regenerate-chapter-btn" type="button" class="secondary-btn">强制重算</button>
+                <button id="align-chapter-btn" type="button">对齐本章段落</button>
+                <button id="confirm-chapter-btn" type="button" class="secondary-btn">确认本章结果</button>
+                <button id="skip-chapter-btn" type="button" class="secondary-btn">标记本章跳过</button>
+                <button id="regenerate-chapter-btn" type="button" class="secondary-btn">重新对齐本章</button>
               </div>
             </div>
             <div id="align-progress-wrap" class="progress-wrap hidden" aria-live="polite">
               <div class="progress-bar">
                 <div id="align-progress-bar" class="progress-fill"></div>
               </div>
-              <p id="align-progress-text" class="muted">正在对齐当前章节...</p>
+              <p id="align-progress-text" class="muted">正在对齐本章段落...</p>
             </div>
 
             <div class="align-grid">
               <div id="anchor-float" class="anchor-float subpanel">
                 <div class="pane-header">
-                  <h4>锚点</h4>
+                  <h4>固定对应</h4>
                   <div class="tiny-actions">
                     <label class="inline-toggle">
                       <input id="anchor-mode" type="checkbox">
-                      点击添加
+                      选择段落
                     </label>
                     <button id="anchor-float-toggle" type="button" class="secondary-btn" aria-expanded="true">收起</button>
                   </div>
                 </div>
                 <div id="anchor-float-body">
-                  <p id="anchor-hint" class="muted">开启后先点左侧中文段落，再点右侧英文段落。</p>
+                  <p id="anchor-hint" class="muted">开启后先点中文段落，再点对应英文段落。</p>
                   <div class="tiny-actions">
-                    <button id="create-anchor-btn" type="button" class="secondary-btn" disabled>创建 anchor</button>
-                    <button id="reset-anchor-btn" type="button" class="secondary-btn" disabled>重选</button>
+                    <button id="create-anchor-btn" type="button" class="secondary-btn" disabled>保存固定对应</button>
+                    <button id="reset-anchor-btn" type="button" class="secondary-btn" disabled>清空选择</button>
                   </div>
                   <div id="anchor-list" class="stack-list compact"></div>
                 </div>
@@ -194,7 +194,7 @@
           <section class="reader-panel panel">
             <div class="pane-header">
               <div>
-                <h3 id="reader-title">Reader</h3>
+                <h3 id="reader-title">阅读区</h3>
                 <p id="reader-meta" class="muted">当前按章节加载，不再渲染整本 DOM。</p>
               </div>
             </div>
@@ -207,11 +207,11 @@
                 <div class="lookup-header">
                   <div>
                     <h4>原文</h4>
-                    <span id="lookup-label" class="tag state-draft">EN</span>
+                    <span id="lookup-label" class="tag state-draft">英文</span>
                   </div>
                   <div class="lookup-actions">
                     <button id="lookup-close-btn" type="button" class="secondary-btn tiny-btn lookup-close-btn">关闭原文</button>
-                    <button id="report-mismatch-btn" type="button" class="secondary-btn tiny-btn hidden">报告对应错误</button>
+                    <button id="report-mismatch-btn" type="button" class="secondary-btn tiny-btn hidden">标记对应有误</button>
                   </div>
                 </div>
                 <div id="lookup-panel" class="lookup-panel">
@@ -227,7 +227,7 @@
     </section>
   </main>
 
-  <script src="frontend_logic.js"></script>
-  <script src="app.js"></script>
+  <script src="frontend_logic.js?v=ui-labels-20260519-1"></script>
+  <script src="app.js?v=ui-labels-20260519-1"></script>
 </body>
 </html>

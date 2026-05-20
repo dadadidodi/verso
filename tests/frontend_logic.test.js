@@ -52,8 +52,8 @@ test("nextChapterIndex stays inside bounds", () => {
 });
 
 test("anchorHint reflects read mode, empty align mode, and pending zh anchor", () => {
-  assert.equal(Logic.anchorHint("read", false, null), "Read mode 中不编辑 anchor。");
-  assert.equal(Logic.anchorHint("align", false, null), "开启后点选连续中文段，再在右侧原文框点选连续英文段。");
+  assert.equal(Logic.anchorHint("read", false, null), "阅读模式不编辑固定对应。");
+  assert.equal(Logic.anchorHint("align", false, null), "开启后点选连续中文段，再在右侧原文框点选对应英文段。");
   assert.equal(Logic.anchorHint("align", true, null), "请选择中文起始段。");
   assert.equal(Logic.anchorHint("align", true, 2), "已选中文第 3 段，请再次点击中文段确定范围。");
 });
@@ -77,8 +77,8 @@ test("englishIndicesForZh expands multi-paragraph english blocks", () => {
 });
 
 test("formatEnglishRangeLabel keeps single and range labels compact", () => {
-  assert.equal(Logic.formatEnglishRangeLabel({ start: 11, end: 12 }), "EN 12-13");
-  assert.equal(Logic.formatEnglishRangeLabel({ start: 4, end: 4 }), "EN 5");
+  assert.equal(Logic.formatEnglishRangeLabel({ start: 11, end: 12 }), "英文 12-13");
+  assert.equal(Logic.formatEnglishRangeLabel({ start: 4, end: 4 }), "英文 5");
 });
 
 test("englishContextWindow shows matched block with one neighbor on each side", () => {
@@ -88,9 +88,9 @@ test("englishContextWindow shows matched block with one neighbor on each side", 
 });
 
 test("alignment labels keep draft source compact", () => {
-  assert.equal(Logic.alignmentSourceLabel("lm"), "LM");
-  assert.equal(Logic.alignmentStateLabel("draft", "mixed"), "draft · mixed");
-  assert.equal(Logic.alignmentStateLabel("confirmed", "lm"), "confirmed");
+  assert.equal(Logic.alignmentSourceLabel("lm"), "AI");
+  assert.equal(Logic.alignmentStateLabel("draft", "mixed"), "待确认 · AI+规则");
+  assert.equal(Logic.alignmentStateLabel("confirmed", "lm"), "已确认");
 });
 
 test("decisionSummary counts segment methods", () => {
@@ -101,6 +101,6 @@ test("decisionSummary counts segment methods", () => {
       { method: "heuristic" },
       { method: "hard_anchor" },
     ]),
-    "4 segments: 1 LM, 2 heuristic, 1 anchor",
+    "4 个片段：1 段 AI，2 段规则，1 段固定对应",
   );
 });

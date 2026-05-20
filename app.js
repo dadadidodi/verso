@@ -122,7 +122,7 @@ function renderMappingCollapsedMeta() {
   const mapped = state.chapters.filter((chapter) => chapter.mapped_en_chapter_index !== null && chapter.mapped_en_chapter_index !== undefined).length;
   els.mappingCollapsedMeta.innerHTML = [
     `<span class="tag state-confirmed">已确认 ${confirmed}/${total || 0}</span>`,
-    `<span class="tag state-draft">已映射 ${mapped}/${total || 0}</span>`,
+    `<span class="tag state-draft">已配对 ${mapped}/${total || 0}</span>`,
   ].join("");
 }
 
@@ -143,13 +143,13 @@ function updateMappingPanelUI() {
   }
   if (els.mappingCollapsedHint) {
     els.mappingCollapsedHint.textContent = canCollapse
-      ? "当前映射已锁定，可随时展开查看和微调。"
-      : "章节映射确认后才可折叠。";
+      ? "当前章节配对已锁定，可随时展开查看和微调。"
+      : "章节配对锁定后才可收起。";
   }
   if (els.mappingToggleBtn) {
     els.mappingToggleBtn.disabled = !canCollapse;
-    els.mappingToggleBtn.textContent = state.mappingCollapsed ? "展开" : "折叠";
-    els.mappingToggleBtn.title = canCollapse ? "折叠或展开已确认的章节映射" : "章节映射确认后才可折叠";
+    els.mappingToggleBtn.textContent = state.mappingCollapsed ? "展开配对" : "收起配对";
+    els.mappingToggleBtn.title = canCollapse ? "收起或展开已锁定的章节配对" : "章节配对锁定后才可收起";
   }
   renderMappingCollapsedMeta();
 }
@@ -190,6 +190,62 @@ function fmtTag(stateName) {
   return `<span class="tag state-${escapeHtml(safeClass)}">${escapeHtml(stateName)}</span>`;
 }
 
+function languageLabel(language) {
+  return language === "zh" ? "中文" : language === "en" ? "英文" : String(language || "未知语言").toUpperCase();
+}
+
+function projectStatusLabel(status) {
+  const labels = {
+    draft: "制作中",
+    mapped: "已配章节",
+    aligned: "已对齐",
+  };
+  return labels[status] || status || "未知状态";
+}
+
+function alignmentStateText(stateName) {
+  const labels = {
+    confirmed: "已确认",
+    draft: "待确认",
+    missing: "未对齐",
+    skipped: "已跳过",
+    approximate: "近似对应",
+  };
+  return labels[stateName] || stateName || "未对齐";
+}
+
+function mappingSourceLabel(source) {
+  const labels = {
+    manual: "手动选择",
+    lm: "AI 建议",
+    llm: "AI 建议",
+    heuristic: "自动规则",
+    fallback: "规则兜底",
+    dp: "自动规则",
+  };
+  return labels[String(source || "").toLowerCase()] || source || "手动选择";
+}
+
+function policyLabel(policy) {
+  if (policy === "off") {
+    return "不使用 AI";
+  }
+  if (policy === "force") {
+    return "强制 AI";
+  }
+  return "自动 AI";
+}
+
+function jobStatusLabel(status) {
+  const labels = {
+    pending: "等待中",
+    running: "进行中",
+    completed: "已完成",
+    failed: "失败",
+  };
+  return labels[status] || status || "未知";
+}
+
 function escapeHtml(text) {
   return String(text || "")
     .replace(/&/g, "&amp;")
@@ -211,13 +267,22 @@ function downloadJson(filename, obj) {
 function updateLibraryUI() {
   document.body.classList.toggle("library-open", state.isLibraryOpen);
   if (els.libraryToggleBtn) {
-    els.libraryToggleBtn.textContent = state.isLibraryOpen ? "隐藏 Library" : "Library";
+    els.libraryToggleBtn.dataset.full = state.isLibraryOpen ? "隐藏书库" : "书库与项目";
+    els.libraryToggleBtn.dataset.short = state.isLibraryOpen ? "隐藏" : "书库";
   }
+  updateResponsiveButtonLabels();
+}
+
+function updateResponsiveButtonLabels() {
+  const compact = window.matchMedia("(max-width: 700px)").matches;
+  document.querySelectorAll(".hero-actions button[data-short]").forEach((button) => {
+    button.textContent = compact ? button.dataset.short : button.dataset.full;
+  });
 }
 
 function bookLabel(book) {
   const format = (book.source_format || "epub").toUpperCase();
-  return `#${book.id} · ${book.title} · ${book.language.toUpperCase()} · ${format} · ${book.chapter_count}章 / ${book.paragraph_count}段`;
+  return `#${book.id} · ${book.title} · ${languageLabel(book.language)} · ${format} · ${book.chapter_count}章 / ${book.paragraph_count}段`;
 }
 
 function renderBookOptions() {
@@ -242,7 +307,7 @@ function renderBookList() {
         <div class="list-card">
           <h4>${escapeHtml(book.title)}</h4>
           <div class="meta-line">${escapeHtml(book.source_filename)}</div>
-          <div class="meta-line">${book.language.toUpperCase()} · ${(book.source_format || "epub").toUpperCase()} · ${book.chapter_count}章 · ${book.paragraph_count}段 · ${book.char_total} chars</div>
+          <div class="meta-line">${languageLabel(book.language)} · ${(book.source_format || "epub").toUpperCase()} · ${book.chapter_count}章 · ${book.paragraph_count}段 · ${book.char_total} 字符</div>
           <div class="card-actions">
             <button class="secondary-btn danger-btn tiny-btn" type="button" data-book-delete-id="${book.id}">删除书籍</button>
           </div>
@@ -263,7 +328,7 @@ function renderProjectList() {
       return `
         <button class="list-card ${active}" data-project-id="${project.id}" type="button">
           <h4>#${project.id} · ${escapeHtml(project.zh_title)} ↔ ${escapeHtml(project.en_title)}</h4>
-          <div class="meta-line">status=${project.status} · mappings=${project.mapping_count} · confirmed=${project.confirmed_count}</div>
+          <div class="meta-line">${escapeHtml(projectStatusLabel(project.status))} · 章节配对 ${project.mapping_count} · 已确认 ${project.confirmed_count}</div>
         </button>
       `;
     })
@@ -276,31 +341,45 @@ function renderJobs() {
     updateJobPolling();
     return;
   }
+  const activeJobIndexes = new Set(
+    state.jobs
+      .map((job, index) => ["pending", "running"].includes(job.status) ? index : null)
+      .filter((index) => index !== null),
+  );
+  const wideVisibleJobIndexes = new Set([0, 1, ...activeJobIndexes]);
+  const hiddenWideCount = state.jobs.filter((_, index) => !wideVisibleJobIndexes.has(index)).length;
   els.jobList.innerHTML = state.jobs
     .map(
-      (job) => {
+      (job, index) => {
         const result = job.result || {};
         const done = Number(result.done_count ?? (result.aligned_chapters || []).length ?? 0);
         const total = Number(result.total_count ?? 0);
         const current = result.current_chapter === null || result.current_chapter === undefined
           ? ""
-          : ` · 当前中${Number(result.current_chapter) + 1}`;
+          : ` · 中${Number(result.current_chapter) + 1}`;
         const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-        const progress = total > 0 ? `${done}/${total}${current}` : `status=${job.status}`;
+        const progress = total > 0 ? `${done}/${total}${current}` : "无进度";
         const policy = job.payload?.llm_policy || result.llm_policy || "auto";
+        const typeLabel = {
+          align_remaining: "对齐剩余章节",
+          prefetch: "预对齐章节",
+        }[job.type] || job.type;
+        const wideVisibilityClass = wideVisibleJobIndexes.has(index) ? "" : " is-job-extra";
         return `
-          <div class="job-row">
+          <div class="job-row${wideVisibilityClass}">
             <div>
-              <strong>${escapeHtml(job.type)}</strong>
-              <div class="meta-line">${escapeHtml(progress)} · policy=${escapeHtml(policy)}</div>
+              <strong>${escapeHtml(typeLabel)}</strong>
+              <div class="meta-line">${escapeHtml(progress)} · ${escapeHtml(policyLabel(policy))}</div>
               ${total > 0 ? `<div class="mini-progress"><span style="width:${Math.max(0, Math.min(100, pct))}%"></span></div>` : ""}
             </div>
-            <span class="tag state-${escapeHtml(job.status)}">${escapeHtml(job.status)}</span>
+            <span class="tag state-${escapeHtml(job.status)}">${escapeHtml(jobStatusLabel(job.status))}</span>
           </div>
         `;
       }
     )
-    .join("");
+    .join("") + (hiddenWideCount > 0
+      ? `<div class="job-summary-row">另有 ${hiddenWideCount} 个较早任务</div>`
+      : "");
   updateJobPolling();
 }
 
@@ -347,7 +426,7 @@ function renderProjectSummary() {
   const project = state.currentProject.project;
   els.projectTitle.textContent = `项目 #${project.id} · ${project.zh_title} ↔ ${project.en_title}`;
   els.projectSummary.textContent =
-    `状态 ${project.status} · 中文 ${stats.zh_chapter_count} 章 / ${stats.zh_paragraph_count} 段 · 英文 ${stats.en_chapter_count} 章 / ${stats.en_paragraph_count} 段 · 已确认 ${stats.confirmed_alignment_count} 章。`;
+    `${projectStatusLabel(project.status)} · 中文 ${stats.zh_chapter_count} 章 / ${stats.zh_paragraph_count} 段 · 英文 ${stats.en_chapter_count} 章 / ${stats.en_paragraph_count} 段 · 已确认 ${stats.confirmed_alignment_count} 章。`;
 }
 
 function renderChapterList() {
@@ -363,14 +442,14 @@ function renderChapterList() {
         : `英${chapter.mapped_en_chapter_index + 1} ${chapter.mapped_en_title || ""}`;
       const alignmentLabel = Logic.alignmentStateLabel
         ? Logic.alignmentStateLabel(chapter.alignment_state, chapter.alignment_source)
-        : chapter.alignment_state;
+        : alignmentStateText(chapter.alignment_state);
       return `
         <button class="chapter-card ${active}" type="button" data-chapter-index="${chapter.zh_chapter_index}">
-          <h4>中${chapter.zh_chapter_index + 1}. ${escapeHtml(chapter.zh_title || "Untitled")}</h4>
+          <h4>中${chapter.zh_chapter_index + 1}. ${escapeHtml(chapter.zh_title || "未命名章节")}</h4>
           <div class="meta-line">${escapeHtml(mapped)}</div>
           <div class="meta-line">
             ${fmtTag(alignmentLabel)}
-            <span class="tag state-${chapter.mapping_confirmed ? "confirmed" : "draft"}">${chapter.mapping_confirmed ? "mapping confirmed" : "mapping draft"}</span>
+            <span class="tag state-${chapter.mapping_confirmed ? "confirmed" : "draft"}">${chapter.mapping_confirmed ? "章节配对已锁定" : "章节配对草稿"}</span>
           </div>
         </button>
       `;
@@ -386,7 +465,7 @@ function renderMappingTable() {
   }
   const enOptions = state.enChapterOptions
     .map((chapter) => {
-      const title = chapter.title || "Untitled";
+      const title = chapter.title || "未命名章节";
       return `<option value="${chapter.en_chapter_index}">${escapeHtml(`英${chapter.en_chapter_index + 1} · ${title}`)}</option>`;
     })
     .join("");
@@ -398,8 +477,8 @@ function renderMappingTable() {
       return `
         <div class="mapping-row">
           <div>
-            <strong>中${chapter.zh_chapter_index + 1}. ${escapeHtml(chapter.zh_title || "Untitled")}</strong>
-            <div class="mapping-meta">source=${escapeHtml(mapping?.source || "manual")} · confidence=${confidence === null || confidence === undefined ? "n/a" : Number(confidence).toFixed(3)}</div>
+            <strong>中${chapter.zh_chapter_index + 1}. ${escapeHtml(chapter.zh_title || "未命名章节")}</strong>
+            <div class="mapping-meta">来源：${escapeHtml(mappingSourceLabel(mapping?.source || "manual"))} · 置信度：${confidence === null || confidence === undefined ? "无" : Number(confidence).toFixed(3)}</div>
             <div class="mapping-meta">${escapeHtml(mapping?.reason || "")}</div>
           </div>
           <div class="mapping-right">
@@ -435,7 +514,7 @@ function upsertLocalMapping(chapterIndex, enIndex) {
 
 function renderAnchors() {
   if (!state.currentAnchors.length) {
-    els.anchorList.innerHTML = `<div class="anchor-row"><span class="muted">当前章节暂无 anchor。</span></div>`;
+    els.anchorList.innerHTML = `<div class="anchor-row"><span class="muted">当前章节还没有人工固定的段落对应。</span></div>`;
     return;
   }
   els.anchorList.innerHTML = state.currentAnchors
@@ -444,9 +523,9 @@ function renderAnchors() {
         <div class="anchor-row">
           <div>
             <strong>中${formatRangeLabel(Number(anchor.zh_start ?? anchor.zh_paragraph_index), Number(anchor.zh_end ?? anchor.zh_paragraph_index))} ↔ 英${formatRangeLabel(Number(anchor.en_start ?? anchor.en_paragraph_index), Number(anchor.en_end ?? anchor.en_paragraph_index))}</strong>
-            <div class="meta-line">${escapeHtml(anchor.kind)} · ${anchor.confirmed ? "confirmed" : "draft"}${anchor.note ? ` · ${escapeHtml(anchor.note)}` : ""}</div>
+            <div class="meta-line">${anchor.kind === "hard" ? "人工固定" : escapeHtml(anchor.kind)} · ${anchor.confirmed ? "已生效" : "草稿"}${anchor.note ? ` · ${escapeHtml(anchor.note)}` : ""}</div>
           </div>
-          <button type="button" data-anchor-id="${anchor.id}" class="secondary-btn">删除</button>
+          <button type="button" data-anchor-id="${anchor.id}" class="secondary-btn">删除固定对应</button>
         </div>
       `
     )
@@ -465,7 +544,7 @@ function renderReviews() {
         <div class="review-row">
           <div>
             <strong>中[${item.zh_start}-${item.zh_end}] → 英[${item.en_start}-${item.en_end}]</strong>
-            <div class="meta-line">conf=${Number(item.confidence).toFixed(3)} · ${escapeHtml(item.reason || "low_confidence")}</div>
+            <div class="meta-line">置信度 ${Number(item.confidence).toFixed(3)} · ${escapeHtml(item.reason || "需要人工检查")}</div>
           </div>
         </div>
       `
@@ -483,7 +562,7 @@ function startMappingProgress() {
   let progress = 6;
   els.mappingProgressWrap.classList.remove("hidden");
   els.mappingProgressBar.style.width = `${progress}%`;
-  els.mappingProgressText.textContent = "正在生成章节映射建议...";
+  els.mappingProgressText.textContent = "正在生成章节配对建议...";
   state.mappingProgressTimer = window.setInterval(() => {
     progress = Math.min(92, progress + (progress < 50 ? 10 : 4));
     els.mappingProgressBar.style.width = `${progress}%`;
@@ -533,8 +612,8 @@ function startAlignProgress(force = false) {
   els.alignProgressWrap.classList.remove("hidden");
   els.alignProgressBar.style.width = `${progress}%`;
   els.alignProgressText.textContent = force
-    ? "正在强制重算并重新对齐当前章节..."
-    : "正在对齐当前章节...";
+    ? "正在重新计算并对齐本章段落..."
+    : "正在对齐本章段落...";
   state.alignProgressTimer = window.setInterval(() => {
     progress = Math.min(94, progress + (progress < 48 ? 11 : 5));
     els.alignProgressBar.style.width = `${progress}%`;
@@ -581,11 +660,12 @@ function setLookupOpen(open) {
   if (els.lookupColumn) {
     els.lookupColumn.classList.toggle("is-open", state.lookupOpen);
   }
-  document.body.classList.toggle("reader-lookup-open", state.lookupOpen && state.mode === "read");
+  const lookupDockMode = state.mode === "read" || state.mode === "align";
+  document.body.classList.toggle("reader-lookup-open", state.lookupOpen && lookupDockMode);
 }
 
 function isMobileReaderLayout() {
-  return window.matchMedia("(max-width: 760px)").matches;
+  return window.matchMedia("(max-width: 1100px)").matches;
 }
 
 function updateAnchorFloatUI() {
@@ -609,9 +689,9 @@ function updateAnchorHint() {
   const hasZh = draft.zhStart !== null && draft.zhEnd !== null;
   const hasEn = draft.enStart !== null && draft.enEnd !== null;
   if (state.mode !== "align") {
-    els.anchorHint.textContent = "Read mode 中不编辑 anchor。";
+    els.anchorHint.textContent = "阅读模式不编辑固定对应。";
   } else if (!els.anchorMode.checked) {
-    els.anchorHint.textContent = "开启后点选连续中文段，再在右侧原文框点选连续英文段。";
+    els.anchorHint.textContent = "开启后点选连续中文段，再在右侧原文框点选对应英文段。";
   } else if (!hasZh) {
     els.anchorHint.textContent = draft.zhStart === null
       ? "请选择中文起始段。"
@@ -621,7 +701,7 @@ function updateAnchorHint() {
       ? `已选中文 ${formatRangeLabel(draft.zhStart, draft.zhEnd)}，请在右侧原文框选择英文起始段。`
       : `已选英文第 ${draft.enStart + 1} 段，请再次点击英文段确定范围。`;
   } else {
-    els.anchorHint.textContent = `待创建 anchor：中 ${formatRangeLabel(draft.zhStart, draft.zhEnd)} ↔ 英 ${formatRangeLabel(draft.enStart, draft.enEnd)}`;
+    els.anchorHint.textContent = `待保存固定对应：中 ${formatRangeLabel(draft.zhStart, draft.zhEnd)} ↔ 英 ${formatRangeLabel(draft.enStart, draft.enEnd)}`;
   }
   if (els.createAnchorBtn) {
     els.createAnchorBtn.disabled = !(state.mode === "align" && els.anchorMode.checked && hasZh && hasEn);
@@ -688,9 +768,9 @@ function paragraphClass(side, localIndex) {
 
 function englishRangeLabel(range) {
   if (!range) {
-    return "EN";
+    return "英文";
   }
-  return Logic.formatEnglishRangeLabel ? Logic.formatEnglishRangeLabel(range) : `EN ${range.start + 1}`;
+  return Logic.formatEnglishRangeLabel ? Logic.formatEnglishRangeLabel(range) : `英文 ${range.start + 1}`;
 }
 
 function renderLookupPanel() {
@@ -706,7 +786,7 @@ function renderLookupPanel() {
   els.lookupPanel.classList.remove("hidden");
   els.lookupContent.style.paddingTop = "0px";
   if (state.activeZhIndex === null || !state.activeEnRange) {
-    els.lookupLabel.textContent = "EN";
+    els.lookupLabel.textContent = "英文";
     els.lookupContent.innerHTML = `<p class="muted">点击中文段落查看对应英文原文。</p>`;
     if (els.reportMismatchBtn) {
       els.reportMismatchBtn.classList.add("hidden");
@@ -730,7 +810,7 @@ function renderLookupPanel() {
       const classes = `${paragraphClass("en", enIndex)} lookup-para${active}`;
       lines.push(`
         <p class="${classes}" data-side="en" data-index="${enIndex}">
-          <span class="lookup-index">EN ${enIndex + 1}</span>
+          <span class="lookup-index">英文 ${enIndex + 1}</span>
           ${escapeHtml(text)}
         </p>
       `);
@@ -742,7 +822,7 @@ function renderLookupPanel() {
 }
 
 function alignLookupToChinese() {
-  if (state.mode === "read" && isMobileReaderLayout()) {
+  if ((state.mode === "read" || state.mode === "align") && isMobileReaderLayout()) {
     return;
   }
   if (state.activeZhIndex === null || !els.lookupPanel || !els.lookupContent) {
@@ -770,11 +850,11 @@ function alignLookupToChinese() {
 function renderReader() {
   const reader = state.currentReader;
   if (!reader) {
-    els.readerTitle.textContent = "Reader";
+    els.readerTitle.textContent = "阅读区";
     els.readerMeta.textContent = "当前项目还没有可加载的章节内容。";
     els.zhScroll.innerHTML = `<p class="para">暂无中文内容。</p>`;
     if (els.enScroll) {
-      els.enScroll.innerHTML = `<p class="para">No English content yet.</p>`;
+      els.enScroll.innerHTML = `<p class="para">暂无英文内容。</p>`;
     }
     state.zhOffsets = [];
     state.enOffsets = [];
@@ -787,8 +867,8 @@ function renderReader() {
     renderLookupPanel();
     return;
   }
-  els.readerTitle.textContent = `中${reader.chapter_index + 1}《${reader.zh_title || "Untitled"}》 ↔ 英${reader.mapped_en_chapter_index + 1}《${reader.en_title || "Untitled"}》`;
-  els.readerMeta.textContent = `sync source: ${reader.sync_source} · 中文 ${reader.zh_paragraphs.length} 段 · 英文 ${reader.en_paragraphs.length} 段`;
+  els.readerTitle.textContent = `中${reader.chapter_index + 1}《${reader.zh_title || "未命名章节"}》 ↔ 英${reader.mapped_en_chapter_index + 1}《${reader.en_title || "未命名章节"}》`;
+  els.readerMeta.textContent = `对应状态：${alignmentStateText(reader.sync_source)} · 中文 ${reader.zh_paragraphs.length} 段 · 英文 ${reader.en_paragraphs.length} 段`;
   state.localSyncMap = Array.isArray(reader.local_sync_map) ? reader.local_sync_map : [];
   state.enRangesByZh = Array.isArray(reader.en_ranges_by_zh) ? reader.en_ranges_by_zh : [];
   state.enReverseMap = Logic.buildReverseMap
@@ -984,7 +1064,7 @@ async function loadCurrentChapter() {
           ? Logic.decisionSummary(metrics.decision_log || [])
           : "";
         els.alignMeta.textContent =
-          `当前章状态: ${state.currentAlignment?.state || "missing"} · 来源: ${source} · llm_calls=${metrics.llm_calls || 0} · heuristic_segments=${metrics.heuristic_segments || 0}${summary ? ` · ${summary}` : ""}`;
+          `当前章：${alignmentStateText(state.currentAlignment?.state)} · 来源：${source} · AI 调用 ${metrics.llm_calls || 0} 次 · 规则段 ${metrics.heuristic_segments || 0}${summary ? ` · ${summary}` : ""}`;
       } else {
         els.alignMeta.textContent = "当前章尚未对齐。";
       }
@@ -1045,7 +1125,7 @@ async function createProject() {
   updateModeUI();
   await refreshLibrary();
   await loadProject(payload.project.id);
-  setStatus("项目已创建。建议先在 Alignment Mode 生成章节映射。");
+  setStatus("项目已创建。建议先进入校对模式，生成章节配对。");
 }
 
 async function deleteCurrentProject() {
@@ -1053,7 +1133,7 @@ async function deleteCurrentProject() {
     return;
   }
   const project = state.currentProject.project;
-  const confirmed = window.confirm(`确定删除项目 #${project.id} 吗？\n这会删除该项目的映射、对齐和 anchor，但不会删除书库里的书籍源文件。`);
+  const confirmed = window.confirm(`确定删除项目 #${project.id} 吗？\n这会删除该项目的章节配对、段落对齐和人工固定对应，但不会删除书库里的书籍源文件。`);
   if (!confirmed) {
     return;
   }
@@ -1090,7 +1170,7 @@ async function deleteBook(bookId) {
     (project) => Number(project.zh_book_id) === Number(bookId) || Number(project.en_book_id) === Number(bookId)
   );
   const projectWarning = relatedProjects.length
-    ? `\n\n这本书正在被 ${relatedProjects.length} 个项目使用；删除书籍会同时删除这些项目的映射、对齐和 anchor。`
+    ? `\n\n这本书正在被 ${relatedProjects.length} 个项目使用；删除书籍会同时删除这些项目的章节配对、段落对齐和人工固定对应。`
     : "";
   const confirmed = window.confirm(`确定从书库删除《${book.title}》吗？\n源文件和解析缓存都会删除。${projectWarning}`);
   if (!confirmed) {
@@ -1140,14 +1220,14 @@ async function suggestMapping() {
     state.mappings = payload.mappings || [];
     await loadProject(state.currentProjectId);
     if (payload.strategy === "fallback") {
-      finishMappingProgress("AI 不可用，已退回 fallback 映射。");
-      setStatus(`章节映射已生成，但当前使用的是 fallback：${payload.fallback_reason || "unknown reason"}`, true);
+      finishMappingProgress("AI 不可用，已改用规则生成章节配对。");
+      setStatus(`章节配对已生成，但当前使用规则兜底：${payload.fallback_reason || "原因未知"}`, true);
     } else {
-      finishMappingProgress("AI 章节映射建议已完成。");
-      setStatus("章节映射建议已生成（策略：AI）。");
+      finishMappingProgress("AI 章节配对建议已完成。");
+      setStatus("章节配对建议已生成。");
     }
   } catch (error) {
-    finishMappingProgress("章节映射建议生成失败。");
+    finishMappingProgress("章节配对建议生成失败。");
     throw error;
   } finally {
     els.suggestMappingBtn.disabled = false;
@@ -1174,7 +1254,7 @@ async function saveMapping() {
     },
   });
   await loadProject(state.currentProjectId);
-  setStatus("章节映射已保存。");
+  setStatus("章节配对草稿已保存。");
 }
 
 async function confirmMapping() {
@@ -1183,7 +1263,7 @@ async function confirmMapping() {
   }
   await api(`/api/projects/${state.currentProjectId}/chapter-mapping/confirm`, { method: "POST" });
   await loadProject(state.currentProjectId);
-  setStatus("章节映射已确认。");
+  setStatus("章节配对已锁定。");
 }
 
 async function alignCurrentChapter(force = false) {
@@ -1201,10 +1281,10 @@ async function alignCurrentChapter(force = false) {
     });
     state.currentAlignment = payload;
     await loadProject(state.currentProjectId);
-    finishAlignProgress(force ? "当前章节已完成重算。" : "当前章节已完成对齐。");
-    setStatus(force ? "当前章节已强制重算。" : "当前章节已完成对齐。");
+    finishAlignProgress(force ? "本章已重新对齐。" : "本章段落已对齐。");
+    setStatus(force ? "本章已重新对齐。" : "本章段落已对齐。");
   } catch (error) {
-    finishAlignProgress(force ? "重算失败。" : "章节对齐失败。");
+    finishAlignProgress(force ? "重新对齐失败。" : "段落对齐失败。");
     throw error;
   } finally {
     setAlignBusy(false);
@@ -1217,7 +1297,7 @@ async function confirmCurrentChapter() {
   }
   await api(`/api/projects/${state.currentProjectId}/chapters/${state.currentChapterIndex}/confirm`, { method: "POST" });
   await loadProject(state.currentProjectId);
-  setStatus("当前章节已确认。");
+  setStatus("本章对齐结果已确认。");
 }
 
 async function skipCurrentChapter() {
@@ -1226,7 +1306,7 @@ async function skipCurrentChapter() {
   }
   await api(`/api/projects/${state.currentProjectId}/chapters/${state.currentChapterIndex}/skip`, { method: "POST" });
   await loadProject(state.currentProjectId);
-  setStatus("当前章节已跳过，并写入近似映射。");
+  setStatus("本章已标记为跳过，并写入近似对应。");
 }
 
 async function createAnchorFromDraft() {
@@ -1251,7 +1331,7 @@ async function createAnchorFromDraft() {
   state.pendingZhAnchor = null;
   state.anchorDraft = { zhStart: null, zhEnd: null, enStart: null, enEnd: null };
   await loadCurrentChapter();
-  setStatus(`已添加 hard anchor：中 ${formatRangeLabel(zhRange.start, zhRange.end)} ↔ 英 ${formatRangeLabel(enRange.start, enRange.end)}。`);
+  setStatus(`已保存固定对应：中 ${formatRangeLabel(zhRange.start, zhRange.end)} ↔ 英 ${formatRangeLabel(enRange.start, enRange.end)}。`);
 }
 
 async function reportMismatch() {
@@ -1271,7 +1351,7 @@ async function reportMismatch() {
       note: "reported_from_reader",
     },
   });
-  setStatus(`已记录 mismatch：中 ${state.activeZhIndex + 1} ↔ 英 ${formatRangeLabel(range.start, range.end)}。`);
+  setStatus(`已标记对应有误：中 ${state.activeZhIndex + 1} ↔ 英 ${formatRangeLabel(range.start, range.end)}。`);
 }
 
 async function deleteAnchor(anchorId) {
@@ -1282,7 +1362,7 @@ async function deleteAnchor(anchorId) {
     method: "DELETE",
   });
   await loadCurrentChapter();
-  setStatus("已删除 anchor。");
+  setStatus("已删除固定对应。");
 }
 
 async function prefetchChapters(alignRemaining = false) {
@@ -1303,7 +1383,7 @@ async function prefetchChapters(alignRemaining = false) {
   const jobsPayload = await api(`/api/projects/${state.currentProjectId}/jobs`);
   state.jobs = jobsPayload.jobs || [];
   renderJobs();
-  setStatus(alignRemaining ? "已启动后台对齐剩余章节。" : "已启动后续章节预取。");
+  setStatus(alignRemaining ? "已开始在后台对齐剩余章节。" : "已开始预对齐后续 2 章。");
 }
 
 async function exportCurrentProject() {
@@ -1408,19 +1488,19 @@ els.modeAlignBtn.addEventListener("click", () => {
 els.prevChapterBtn.addEventListener("click", () => moveChapter(-1));
 els.nextChapterBtn.addEventListener("click", () => moveChapter(1));
 els.prefetchBtn.addEventListener("click", () => {
-  prefetchChapters(false).catch((error) => setStatus(error instanceof Error ? error.message : "预取失败。", true));
+  prefetchChapters(false).catch((error) => setStatus(error instanceof Error ? error.message : "预对齐失败。", true));
 });
 els.alignRemainingBtn.addEventListener("click", () => {
-  prefetchChapters(true).catch((error) => setStatus(error instanceof Error ? error.message : "后台对齐失败。", true));
+  prefetchChapters(true).catch((error) => setStatus(error instanceof Error ? error.message : "对齐剩余章节失败。", true));
 });
 els.suggestMappingBtn.addEventListener("click", () => {
-  suggestMapping().catch((error) => setStatus(error instanceof Error ? error.message : "生成映射失败。", true));
+  suggestMapping().catch((error) => setStatus(error instanceof Error ? error.message : "生成章节配对失败。", true));
 });
 els.saveMappingBtn.addEventListener("click", () => {
-  saveMapping().catch((error) => setStatus(error instanceof Error ? error.message : "保存映射失败。", true));
+  saveMapping().catch((error) => setStatus(error instanceof Error ? error.message : "保存章节配对失败。", true));
 });
 els.confirmMappingBtn.addEventListener("click", () => {
-  confirmMapping().catch((error) => setStatus(error instanceof Error ? error.message : "确认映射失败。", true));
+  confirmMapping().catch((error) => setStatus(error instanceof Error ? error.message : "锁定章节配对失败。", true));
 });
 els.mappingToggleBtn.addEventListener("click", () => {
   if (!isMappingConfirmed()) {
@@ -1434,16 +1514,16 @@ els.mappingCollapsedExpandBtn.addEventListener("click", () => {
   updateMappingPanelUI();
 });
 els.alignChapterBtn.addEventListener("click", () => {
-  alignCurrentChapter(false).catch((error) => setStatus(error instanceof Error ? error.message : "章节对齐失败。", true));
+  alignCurrentChapter(false).catch((error) => setStatus(error instanceof Error ? error.message : "本章段落对齐失败。", true));
 });
 els.confirmChapterBtn.addEventListener("click", () => {
-  confirmCurrentChapter().catch((error) => setStatus(error instanceof Error ? error.message : "确认章节失败。", true));
+  confirmCurrentChapter().catch((error) => setStatus(error instanceof Error ? error.message : "确认本章结果失败。", true));
 });
 els.skipChapterBtn.addEventListener("click", () => {
-  skipCurrentChapter().catch((error) => setStatus(error instanceof Error ? error.message : "跳过章节失败。", true));
+  skipCurrentChapter().catch((error) => setStatus(error instanceof Error ? error.message : "标记本章跳过失败。", true));
 });
 els.regenerateChapterBtn.addEventListener("click", () => {
-  alignCurrentChapter(true).catch((error) => setStatus(error instanceof Error ? error.message : "重算章节失败。", true));
+  alignCurrentChapter(true).catch((error) => setStatus(error instanceof Error ? error.message : "重新对齐本章失败。", true));
 });
 els.anchorMode.addEventListener("change", () => {
   resetAnchorDraft();
@@ -1465,7 +1545,7 @@ els.anchorFloat?.addEventListener("click", () => {
 
 els.createAnchorBtn?.addEventListener("click", () => {
   createAnchorFromDraft().catch((error) => {
-    setStatus(error instanceof Error ? error.message : "创建 anchor 失败。", true);
+    setStatus(error instanceof Error ? error.message : "保存固定对应失败。", true);
   });
 });
 
@@ -1475,7 +1555,7 @@ els.resetAnchorBtn?.addEventListener("click", () => {
 
 els.reportMismatchBtn?.addEventListener("click", () => {
   reportMismatch().catch((error) => {
-    setStatus(error instanceof Error ? error.message : "报告 mismatch 失败。", true);
+    setStatus(error instanceof Error ? error.message : "标记对应错误失败。", true);
   });
 });
 
@@ -1489,7 +1569,7 @@ els.anchorList.addEventListener("click", (event) => {
     return;
   }
   deleteAnchor(Number(btn.dataset.anchorId)).catch((error) => {
-    setStatus(error instanceof Error ? error.message : "删除 anchor 失败。", true);
+    setStatus(error instanceof Error ? error.message : "删除固定对应失败。", true);
   });
 });
 
@@ -1529,7 +1609,7 @@ function handleParagraphClick(event, side) {
     return;
   }
   if (state.anchorDraft.zhStart === null || state.anchorDraft.zhEnd === null) {
-    setStatus("请先点击左侧中文段落两次，确定 anchor 的中文范围。", true);
+    setStatus("请先点击左侧中文段落两次，确定固定对应的中文范围。", true);
     return;
   }
   if (state.anchorDraft.enStart === null || state.anchorDraft.enEnd !== null) {
@@ -1548,6 +1628,7 @@ function handleParagraphClick(event, side) {
 els.zhScroll.addEventListener("click", (event) => handleParagraphClick(event, "zh"));
 els.enScroll?.addEventListener("click", (event) => handleParagraphClick(event, "en"));
 els.lookupContent?.addEventListener("click", (event) => handleParagraphClick(event, "en"));
+window.addEventListener("resize", updateResponsiveButtonLabels);
 
 refreshLibrary().then(() => {
   renderProjectSummary();

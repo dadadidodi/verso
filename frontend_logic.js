@@ -88,10 +88,10 @@
 
   function anchorHint(mode, anchorModeEnabled, pendingZhAnchor) {
     if (mode !== "align") {
-      return "Read mode 中不编辑 anchor。";
+      return "阅读模式不编辑固定对应。";
     }
     if (!anchorModeEnabled) {
-      return "开启后点选连续中文段，再在右侧原文框点选连续英文段。";
+      return "开启后点选连续中文段，再在右侧原文框点选对应英文段。";
     }
     if (pendingZhAnchor === null || pendingZhAnchor === undefined) {
       return "请选择中文起始段。";
@@ -136,7 +136,7 @@
   function formatEnglishRangeLabel(range) {
     const start = Number(range?.start ?? 0) + 1;
     const end = Number(range?.end ?? start - 1) + 1;
-    return start === end ? `EN ${start}` : `EN ${start}-${end}`;
+    return start === end ? `英文 ${start}` : `英文 ${start}-${end}`;
   }
 
   function englishContextWindow(enLength, range, before = 1, after = 1) {
@@ -153,28 +153,34 @@
   function alignmentSourceLabel(source) {
     const normalized = String(source || "").toLowerCase();
     if (normalized === "lm" || normalized === "llm") {
-      return "LM";
+      return "AI";
     }
     if (normalized === "heuristic") {
-      return "heuristic";
+      return "自动规则";
     }
     if (normalized === "mixed") {
-      return "mixed";
+      return "AI+规则";
     }
     if (normalized === "fallback") {
-      return "fallback";
+      return "规则兜底";
     }
     if (normalized === "skipped") {
-      return "skipped";
+      return "已跳过";
     }
-    return normalized || "unknown";
+    return normalized || "未知来源";
   }
 
   function alignmentStateLabel(state, source) {
     if (state === "draft") {
-      return `draft · ${alignmentSourceLabel(source)}`;
+      return `待确认 · ${alignmentSourceLabel(source)}`;
     }
-    return state || "missing";
+    const labels = {
+      confirmed: "已确认",
+      missing: "未对齐",
+      skipped: "已跳过",
+      approximate: "近似对应",
+    };
+    return labels[state] || state || "未对齐";
   }
 
   function decisionSummary(decisionLog) {
@@ -186,18 +192,18 @@
     }, {});
     const parts = [];
     if (counts.llm) {
-      parts.push(`${counts.llm} LM`);
+      parts.push(`${counts.llm} 段 AI`);
     }
     if (counts.heuristic) {
-      parts.push(`${counts.heuristic} heuristic`);
+      parts.push(`${counts.heuristic} 段规则`);
     }
     if (counts.hard_anchor) {
-      parts.push(`${counts.hard_anchor} anchor`);
+      parts.push(`${counts.hard_anchor} 段固定对应`);
     }
     if (counts.empty_gap) {
-      parts.push(`${counts.empty_gap} empty`);
+      parts.push(`${counts.empty_gap} 段空白`);
     }
-    return `${decisions.length} segments${parts.length ? `: ${parts.join(", ")}` : ""}`;
+    return `${decisions.length} 个片段${parts.length ? `：${parts.join("，")}` : ""}`;
   }
 
   return {
