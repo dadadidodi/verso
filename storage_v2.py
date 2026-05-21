@@ -66,7 +66,7 @@ class StorageConfig:
         return self.root / "projects"
 
 
-class DuReadingStore:
+class VersoStore:
     def __init__(self, root: Path | str = "storage") -> None:
         self.config = StorageConfig(Path(root).resolve())
         self.config.root.mkdir(parents=True, exist_ok=True)

@@ -3,7 +3,7 @@
   if (typeof module !== "undefined" && module.exports) {
     module.exports = api;
   }
-  root.DuReadingFrontendLogic = api;
+  root.VersoFrontendLogic = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function frontendLogicFactory() {
   function buildInitialMappings(chapters, rawMappings, enChapterCount) {
     return chapters.map((chapter, index) => {

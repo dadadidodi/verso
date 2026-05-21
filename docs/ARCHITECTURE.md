@@ -4,7 +4,7 @@
 
 ## 系统边界
 
-DuReading 有两个 surface：
+verso 有两个 surface：
 
 - Local Align app：`web_server.py` 服务的本地完整应用，负责写入和修改数据。
 - Static Reader site：`export_reader_site.py` 生成的只读静态站，负责分享阅读内容。
@@ -27,7 +27,7 @@ Local Align app 是 source of truth。Static Reader 是从本地状态导出的 
 
 ## Storage Model
 
-默认 storage root 是 `storage/`，可用 `DUREADING_STORAGE_DIR` 覆盖。
+默认 storage root 是 `storage/`，可用 `VERSO_STORAGE_DIR` 覆盖。
 
 主要 SQLite 表：
 

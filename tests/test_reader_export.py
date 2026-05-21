@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from export_reader_site import export_reader_site, password_hash
-from storage_v2 import DuReadingStore
+from storage_v2 import VersoStore
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -18,7 +18,7 @@ requires_middlemarch_epubs = pytest.mark.skipif(
 )
 
 
-def _chapter_lengths(store: DuReadingStore, project_id: int, chapter_index: int) -> tuple[int, int]:
+def _chapter_lengths(store: VersoStore, project_id: int, chapter_index: int) -> tuple[int, int]:
     overview = store.build_project_overview(project_id)
     project = overview["project"]
     zh_paragraphs, _ = store.load_book_document(int(project["zh_book_id"]))
@@ -32,7 +32,7 @@ def _chapter_lengths(store: DuReadingStore, project_id: int, chapter_index: int)
     return zh_len, en_len
 
 
-def _save_alignment(store: DuReadingStore, project_id: int, chapter_index: int, state: str) -> None:
+def _save_alignment(store: VersoStore, project_id: int, chapter_index: int, state: str) -> None:
     zh_len, en_len = _chapter_lengths(store, project_id, chapter_index)
     store.save_chapter_alignment(
         project_id,
@@ -62,7 +62,7 @@ def _save_alignment(store: DuReadingStore, project_id: int, chapter_index: int, 
 
 @requires_middlemarch_epubs
 def test_export_reader_site_exports_draft_and_confirmed_safe_payload(tmp_path: Path) -> None:
-    store = DuReadingStore(tmp_path / "storage")
+    store = VersoStore(tmp_path / "storage")
     zh_book = store.create_or_get_book(
         language="zh",
         filename="CnMiddlemarch.epub",
@@ -163,7 +163,7 @@ def test_export_reader_site_exports_draft_and_confirmed_safe_payload(tmp_path: P
 
 @requires_middlemarch_epubs
 def test_export_reader_site_skips_missing_and_skipped_chapters(tmp_path: Path) -> None:
-    store = DuReadingStore(tmp_path / "storage")
+    store = VersoStore(tmp_path / "storage")
     zh_book = store.create_or_get_book(
         language="zh",
         filename="CnMiddlemarch.epub",

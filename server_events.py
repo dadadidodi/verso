@@ -12,7 +12,7 @@ _event_lock = threading.Lock()
 
 
 def _event_log_path() -> Path:
-    custom = os.getenv("DUREADING_SERVER_EVENTS_FILE", "").strip()
+    custom = os.getenv("VERSO_SERVER_EVENTS_FILE", "").strip()
     if custom:
         return Path(custom)
     return Path("log") / "server_events.log"

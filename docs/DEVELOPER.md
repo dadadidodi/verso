@@ -51,10 +51,10 @@ OPENAI_MODEL=gpt-4.1
 
 常用变量：
 
-- `DUREADING_STORAGE_DIR`：storage root，默认 `storage/`。
-- `DUREADING_LLM_DEBUG=1`：写完整 LLM prompt/response。
-- `DUREADING_LLM_DEBUG_FILE`：覆盖 `log/llm_debug.log`。
-- `DUREADING_SERVER_EVENTS_FILE`：覆盖 `log/server_events.log`。
+- `VERSO_STORAGE_DIR`：storage root，默认 `storage/`。
+- `VERSO_LLM_DEBUG=1`：写完整 LLM prompt/response。
+- `VERSO_LLM_DEBUG_FILE`：覆盖 `log/llm_debug.log`。
+- `VERSO_SERVER_EVENTS_FILE`：覆盖 `log/server_events.log`。
 
 ## 数据流速览
 
@@ -120,7 +120,7 @@ node --check dist-reader/reader.js
 
 日志分两类：
 
-- `log/llm_debug.log`：完整 LLM prompt/response，只在开启 `DUREADING_LLM_DEBUG=1` 时写入。
+- `log/llm_debug.log`：完整 LLM prompt/response，只在开启 `VERSO_LLM_DEBUG=1` 时写入。
 - `log/server_events.log`：JSONL 系统事件，包括 alignment decision、cache hit、job progress、rate-limit fallback。
 
 如果想知道某章为什么走 heuristic、LM、mixed 或 fallback，优先看 `server_events.log`。

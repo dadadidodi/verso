@@ -107,6 +107,26 @@ button:disabled {
   line-height: 1.1;
 }
 
+.brand-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.brand-title-cn {
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.brand-title-en {
+  color: var(--warm);
+  font-size: 16px;
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
 .hero-copy {
   margin: 0;
   max-width: 760px;
@@ -1054,6 +1074,14 @@ select {
     white-space: nowrap;
   }
 
+  .brand-title-cn {
+    font-size: 20px;
+  }
+
+  .brand-title-en {
+    font-size: 13px;
+  }
+
   .hero-actions {
     flex: 1;
     flex-wrap: nowrap;
@@ -1349,6 +1377,14 @@ select {
 
   .hero h1 {
     font-size: 18px;
+  }
+
+  .brand-title-cn {
+    font-size: 18px;
+  }
+
+  .brand-title-en {
+    font-size: 12px;
   }
 
   .hero-actions button {

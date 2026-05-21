@@ -37,13 +37,13 @@ Reader 可以配置一个或多个阅读密码。
 确认本地项目已经有 draft 或 confirmed 章节，然后运行：
 
 ```bash
-DUREADING_READER_PASSWORDS="private-password,friend-password" ./publish_reader.sh PROJECT_ID
+VERSO_READER_PASSWORDS="private-password,friend-password" ./publish_reader.sh PROJECT_ID
 ```
 
 只需要一个密码时：
 
 ```bash
-DUREADING_READER_PASSWORD="shared-reader-password" ./publish_reader.sh PROJECT_ID
+VERSO_READER_PASSWORD="shared-reader-password" ./publish_reader.sh PROJECT_ID
 ```
 
 导出结果在 `dist-reader/`。
@@ -82,14 +82,14 @@ Vercel 通常会返回两个地址：
 如果 `dist-reader/manifest.json` 还在，可以复用里面的旧 password hashes：
 
 ```bash
-python3 - <<'PY' > /tmp/dureading_reader_hash_args.txt
+python3 - <<'PY' > /tmp/verso_reader_hash_args.txt
 import json
 manifest = json.load(open("dist-reader/manifest.json"))
 for item in manifest.get("reader_password_hashes") or [manifest["reader_password_hash"]]:
     print("--reader-password-hash", item)
 PY
 
-python3 export_reader_site.py --project-id PROJECT_ID --out dist-reader $(cat /tmp/dureading_reader_hash_args.txt)
+python3 export_reader_site.py --project-id PROJECT_ID --out dist-reader $(cat /tmp/verso_reader_hash_args.txt)
 npx vercel deploy dist-reader --prod
 ```
 
@@ -98,7 +98,7 @@ npx vercel deploy dist-reader --prod
 重新导出时传多个密码：
 
 ```bash
-DUREADING_READER_PASSWORDS="private-password,friend-simple-password" ./publish_reader.sh PROJECT_ID
+VERSO_READER_PASSWORDS="private-password,friend-simple-password" ./publish_reader.sh PROJECT_ID
 npx vercel deploy dist-reader --prod
 ```
 

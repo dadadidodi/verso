@@ -520,7 +520,7 @@ def positive_int(value: str) -> int:
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Convert a text/scanned PDF into a DuReading-friendly EPUB.")
+    parser = argparse.ArgumentParser(description="Convert a text/scanned PDF into a verso-friendly EPUB.")
     parser.add_argument("pdf", type=Path, help="Input PDF path.")
     parser.add_argument("--out", type=Path, required=True, help="Output EPUB path.")
     parser.add_argument("--work-dir", type=Path, required=True, help="Directory for OCR cache and reports.")

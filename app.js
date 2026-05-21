@@ -68,7 +68,7 @@ const els = {
   enScroll: document.getElementById("en-scroll"),
 };
 
-const Logic = window.DuReadingFrontendLogic || {};
+const Logic = window.VersoFrontendLogic || {};
 
 const state = {
   books: [],
@@ -1391,7 +1391,7 @@ async function exportCurrentProject() {
     return;
   }
   const payload = await api(`/api/projects/${state.currentProjectId}/export`);
-  downloadJson(`dureading_project_${state.currentProjectId}.json`, payload);
+  downloadJson(`verso_project_${state.currentProjectId}.json`, payload);
   setStatus("项目快照已导出。");
 }
 

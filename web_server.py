@@ -20,7 +20,7 @@ from document_parser import detect_source_format
 from hybrid_alignment import align_chapter_hybrid, suggest_chapter_mappings
 from paragraph_alignment import AlignmentBlock, expand_en_ranges_from_blocks
 from server_events import append_server_event
-from storage_v2 import DuReadingStore
+from storage_v2 import VersoStore
 
 
 APP_ROOT = Path(__file__).resolve().parent
@@ -113,7 +113,7 @@ def _alignment_source_from_metrics(state: str, metrics: Dict[str, Any]) -> str:
     return "heuristic"
 
 
-def _project_context(store: DuReadingStore, project_id: int) -> Dict[str, Any]:
+def _project_context(store: VersoStore, project_id: int) -> Dict[str, Any]:
     try:
         overview = store.build_project_overview(project_id)
     except KeyError as exc:
@@ -133,21 +133,21 @@ def _project_context(store: DuReadingStore, project_id: int) -> Dict[str, Any]:
     }
 
 
-def _project_overview_or_404(store: DuReadingStore, project_id: int) -> Dict[str, Any]:
+def _project_overview_or_404(store: VersoStore, project_id: int) -> Dict[str, Any]:
     try:
         return store.build_project_overview(project_id)
     except KeyError as exc:
         raise _http_404(str(exc)) from exc
 
 
-def _book_or_404(store: DuReadingStore, book_id: int) -> Dict[str, Any]:
+def _book_or_404(store: VersoStore, book_id: int) -> Dict[str, Any]:
     try:
         return store.get_book(book_id)
     except KeyError as exc:
         raise _http_404(str(exc)) from exc
 
 
-def _validate_project_books(store: DuReadingStore, zh_book_id: int, en_book_id: int) -> None:
+def _validate_project_books(store: VersoStore, zh_book_id: int, en_book_id: int) -> None:
     zh_book = _book_or_404(store, zh_book_id)
     en_book = _book_or_404(store, en_book_id)
     if zh_book.get("language") != "zh":
@@ -272,7 +272,7 @@ def _anchor_range_from_request(request: AnchorCreateRequest) -> Dict[str, int]:
 
 
 def _validate_anchor_range(
-    store: DuReadingStore,
+    store: VersoStore,
     project_id: int,
     chapter_index: int,
     anchor_range: Dict[str, int],
@@ -337,7 +337,7 @@ def _serialize_alignment_payload(
     return payload
 
 
-def _reader_payload(store: DuReadingStore, project_id: int, chapter_index: int) -> Dict[str, Any]:
+def _reader_payload(store: VersoStore, project_id: int, chapter_index: int) -> Dict[str, Any]:
     ctx = _project_context(store, project_id)
     scope = _chapter_scope(ctx, chapter_index)
     alignment = store.get_chapter_alignment(project_id, chapter_index)
@@ -374,7 +374,7 @@ def _is_llm_rate_limit_error(exc: Exception) -> bool:
 
 
 def _run_align_one(
-    store: DuReadingStore,
+    store: VersoStore,
     project_id: int,
     chapter_index: int,
     *,
@@ -527,7 +527,7 @@ def _run_align_one(
 
 
 def _background_prefetch(
-    store: DuReadingStore,
+    store: VersoStore,
     project_id: int,
     job_id: int,
     *,
@@ -644,9 +644,9 @@ def _background_prefetch(
 
 
 def create_app(storage_root: Optional[Path | str] = None) -> FastAPI:
-    root = Path(storage_root or os.getenv("DUREADING_STORAGE_DIR", "storage"))
-    store = DuReadingStore(root)
-    app = FastAPI(title="DuReading V2", version="2.0")
+    root = Path(storage_root or os.getenv("VERSO_STORAGE_DIR", "storage"))
+    store = VersoStore(root)
+    app = FastAPI(title="verso", version="2.0")
     app.state.store = store
     app.add_middleware(
         CORSMiddleware,
@@ -991,7 +991,7 @@ app = create_app()
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="DuReading v2 FastAPI server")
+    parser = argparse.ArgumentParser(description="verso FastAPI server")
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args()
     uvicorn.run("web_server:app", host="0.0.0.0", port=args.port, reload=False)

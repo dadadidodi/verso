@@ -10,26 +10,26 @@ fi
 PROJECT_ID="$1"
 OUT_DIR="${2:-dist-reader}"
 
-if [[ -z "${DUREADING_READER_PASSWORD:-}" && -z "${DUREADING_READER_PASSWORDS:-}" && -z "${DUREADING_READER_PASSWORD_HASH:-}" && -z "${DUREADING_READER_PASSWORD_HASHES:-}" ]]; then
-  echo "Set DUREADING_READER_PASSWORD(S) or DUREADING_READER_PASSWORD_HASH(ES) before publishing." >&2
+if [[ -z "${VERSO_READER_PASSWORD:-}" && -z "${VERSO_READER_PASSWORDS:-}" && -z "${VERSO_READER_PASSWORD_HASH:-}" && -z "${VERSO_READER_PASSWORD_HASHES:-}" ]]; then
+  echo "Set VERSO_READER_PASSWORD(S) or VERSO_READER_PASSWORD_HASH(ES) before publishing." >&2
   exit 2
 fi
 
 ARGS=(--project-id "${PROJECT_ID}" --out "${OUT_DIR}")
-if [[ -n "${DUREADING_READER_PASSWORD_HASH:-}" ]]; then
-  ARGS+=(--reader-password-hash "${DUREADING_READER_PASSWORD_HASH}")
+if [[ -n "${VERSO_READER_PASSWORD_HASH:-}" ]]; then
+  ARGS+=(--reader-password-hash "${VERSO_READER_PASSWORD_HASH}")
 fi
-if [[ -n "${DUREADING_READER_PASSWORD_HASHES:-}" ]]; then
-  IFS=',' read -ra HASH_ITEMS <<< "${DUREADING_READER_PASSWORD_HASHES}"
+if [[ -n "${VERSO_READER_PASSWORD_HASHES:-}" ]]; then
+  IFS=',' read -ra HASH_ITEMS <<< "${VERSO_READER_PASSWORD_HASHES}"
   for item in "${HASH_ITEMS[@]}"; do
     [[ -n "${item}" ]] && ARGS+=(--reader-password-hash "${item}")
   done
 fi
-if [[ -n "${DUREADING_READER_PASSWORD:-}" ]]; then
-  ARGS+=(--reader-password "${DUREADING_READER_PASSWORD}")
+if [[ -n "${VERSO_READER_PASSWORD:-}" ]]; then
+  ARGS+=(--reader-password "${VERSO_READER_PASSWORD}")
 fi
-if [[ -n "${DUREADING_READER_PASSWORDS:-}" ]]; then
-  IFS=',' read -ra PASSWORD_ITEMS <<< "${DUREADING_READER_PASSWORDS}"
+if [[ -n "${VERSO_READER_PASSWORDS:-}" ]]; then
+  IFS=',' read -ra PASSWORD_ITEMS <<< "${VERSO_READER_PASSWORDS}"
   for item in "${PASSWORD_ITEMS[@]}"; do
     [[ -n "${item}" ]] && ARGS+=(--reader-password "${item}")
   done

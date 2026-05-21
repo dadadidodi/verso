@@ -65,13 +65,13 @@ def safe_json_int(val: object, default: int = 0) -> int:
 
 def is_llm_debug_enabled() -> bool:
     load_env_file()
-    v = os.getenv("DUREADING_LLM_DEBUG", "").strip().lower()
+    v = os.getenv("VERSO_LLM_DEBUG", "").strip().lower()
     return v in ("1", "true", "yes", "on")
 
 
 def _llm_debug_file_path() -> Path:
     load_env_file()
-    custom = os.getenv("DUREADING_LLM_DEBUG_FILE", "").strip()
+    custom = os.getenv("VERSO_LLM_DEBUG_FILE", "").strip()
     if custom:
         return Path(custom)
     return Path("log") / "llm_debug.log"

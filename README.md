@@ -1,6 +1,6 @@
-# DuReading
+# verso
 
-DuReading 是一个双语阅读和翻译校对工具：把中文译文和英文原文按章节、段落对齐，让读者主要读中文，在觉得译文不可靠时快速查看对应英文。它的核心不是“并排对照”，而是“中文主读 + 原文查阅”。内容制作和校对在本地完成，最后可以导出一个只读的静态 Reader 网站分享给别人。
+verso 是一个双语阅读和翻译校对工具：把中文译文和英文原文按章节、段落对齐，让读者主要读中文，在觉得译文不可靠时快速查看对应英文。它的核心不是“并排对照”，而是“中文主读 + 原文查阅”。内容制作和校对在本地完成，最后可以导出一个只读的静态 Reader 网站分享给别人。
 
 当前 UI slogan：`这要命的译文！！！`
 
@@ -16,6 +16,7 @@ DuReading 是一个双语阅读和翻译校对工具：把中文译文和英文�
 
 | 你的目标 | 先看这里 |
 | --- | --- |
+| 我想看图文版完整使用流程 | [docs/USER_GUIDE.md](docs/USER_GUIDE.md) |
 | 我是阅读者/朋友，只想知道怎么读 | [docs/READER.md](docs/READER.md) |
 | 我是项目 owner，要制作和校对对齐内容 | [docs/ALIGNER.md](docs/ALIGNER.md) |
 | 我要把 Reader 网站发布出去 | [docs/PUBLISHING.md](docs/PUBLISHING.md) |
@@ -24,7 +25,7 @@ DuReading 是一个双语阅读和翻译校对工具：把中文译文和英文�
 
 ## 两套网站
 
-DuReading 有两个明确分开的使用形态：
+verso 有两个明确分开的使用形态：
 
 - 本地 Align app：运行在 `localhost:8000`，私有、可写、有 Library、Read Mode、Alignment Mode、上传、删除、章节映射、段落对齐、Anchor、后台任务和可选 LLM 调用。
 - 静态 Reader site：从本地项目导出到 `dist-reader/` 后部署，供别人阅读，只读、有前端轻密码、没有 Align Mode、没有上传/删除/LLM/SQLite/log/source EPUB。
@@ -62,7 +63,7 @@ OPENAI_MODEL=gpt-4.1
 先在本地 Align app 里完成对齐，再导出 reader-only 网站：
 
 ```bash
-DUREADING_READER_PASSWORDS="private-password,friend-password" ./publish_reader.sh PROJECT_ID
+VERSO_READER_PASSWORDS="private-password,friend-password" ./publish_reader.sh PROJECT_ID
 ```
 
 部署到 Vercel：

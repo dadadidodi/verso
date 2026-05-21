@@ -1,1 +1,1 @@
-# Tests package for DuReading
+# Tests package for verso

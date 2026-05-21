@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Sequence
 
-from storage_v2 import DuReadingStore
+from storage_v2 import VersoStore
 
 
 READER_INDEX_HTML = """<!doctype html>
@@ -18,13 +18,13 @@ READER_INDEX_HTML = """<!doctype html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DuReading Reader</title>
+  <title>verso Reader</title>
   <link rel="stylesheet" href="reader.css">
 </head>
 <body>
   <main class="shell">
     <section id="login-panel" class="login-panel">
-      <p class="eyebrow">DuReading Reader</p>
+      <p class="eyebrow">verso Reader</p>
       <h1>这要命的译文！！！</h1>
       <p class="muted">请输入阅读密码。这个静态站只包含阅读内容。</p>
       <form id="login-form" class="login-form">
@@ -38,7 +38,7 @@ READER_INDEX_HTML = """<!doctype html>
     <section id="reader-app" class="reader-app hidden">
       <header class="reader-header">
         <div>
-          <p class="eyebrow">DuReading Reader</p>
+          <p class="eyebrow">verso Reader</p>
           <h1 id="project-title">Reader</h1>
           <p id="project-meta" class="muted"></p>
         </div>
@@ -477,7 +477,7 @@ async function sha256Hex(text) {
 
 function authKey() {
   const hashes = passwordHashes();
-  return `dureading_reader_auth_${hashes.join("_").slice(0, 32)}`;
+  return `verso_reader_auth_${hashes.join("_").slice(0, 32)}`;
 }
 
 function isUnlocked() {
@@ -535,7 +535,7 @@ function formatEnglishRange(range) {
 }
 
 function renderManifest() {
-  els.projectTitle.textContent = state.manifest.project_title || "DuReading Reader";
+  els.projectTitle.textContent = state.manifest.project_title || "verso Reader";
   els.projectMeta.textContent = `${state.manifest.chapters.length} readable chapters · generated ${state.manifest.generated_at}`;
   els.chapterList.innerHTML = state.manifest.chapters
     .map((chapter) => {
@@ -740,7 +740,7 @@ def export_reader_site(
         password_hash_value=reader_password_hash,
         password_hashes=reader_password_hashes,
     )
-    store = DuReadingStore(storage_root)
+    store = VersoStore(storage_root)
     overview = store.build_project_overview(project_id)
     project = overview["project"]
     zh_paragraphs, _ = store.load_book_document(int(project["zh_book_id"]))
@@ -815,7 +815,7 @@ def export_reader_site(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Export a draft/confirmed DuReading project as a static reader site.")
+    parser = argparse.ArgumentParser(description="Export a draft/confirmed verso project as a static reader site.")
     parser.add_argument("--project-id", type=int, required=True)
     parser.add_argument("--out", type=Path, default=Path("dist-reader"))
     parser.add_argument("--storage-root", type=Path, default=Path("storage"))
