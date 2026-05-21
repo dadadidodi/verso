@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List
 
-from chapter_catalog import ChapterSegment, PARSER_VERSION as EPUB_PARSER_VERSION, extract_epub_document_from_bytes
+from epub_parser import ChapterSegment, PARSER_VERSION as EPUB_PARSER_VERSION, extract_epub_document_from_bytes
 
 
 @dataclass

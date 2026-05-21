@@ -16,10 +16,10 @@ Local Align app 是 source of truth。Static Reader 是从本地状态导出的 
 | Area | Files | Responsibility |
 | --- | --- | --- |
 | FastAPI app | `web_server.py` | 本地静态文件服务和 API |
-| Persistence | `storage_v2.py` | SQLite schema、migration、artifact path、project state |
-| EPUB parsing | `document_parser.py`, `chapter_catalog.py` | EPUB 到 paragraphs/chapters |
+| Persistence | `storage.py` | SQLite schema、migration、artifact path、project state |
+| EPUB parsing | `book_import.py`, `epub_parser.py` | EPUB 到 paragraphs/chapters |
 | PDF tooling | `tools/pdf_to_epub_ocr.py`, `tools/pdf_text.py` | 实验性离线 PDF→EPUB |
-| LLM utilities | `alignment_common.py`, `utils.py` | `.env`、OpenAI-compatible JSON call、LLM debug log |
+| LLM utilities | `llm_client.py`, `utils.py` | `.env`、OpenAI-compatible JSON call、LLM debug log |
 | Alignment | `hybrid_alignment.py`, `paragraph_alignment.py` | chapter mapping、block/range paragraph alignment、Anchor constraints |
 | Server events | `server_events.py` | JSONL decision/job/cache logging |
 | Local frontend | `index.html`, `app.js`, `frontend_logic.js`, `styles.css` | Library、Read Mode、Alignment Mode、Anchor UI |

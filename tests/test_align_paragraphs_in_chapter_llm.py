@@ -24,7 +24,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from alignment_common import get_api_config  # noqa: E402
+from llm_client import get_api_config  # noqa: E402
 from paragraph_alignment import (  # noqa: E402
     AlignmentBlock,
     align_paragraphs_in_chapter_llm,

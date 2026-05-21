@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from alignment_common import ApiConfig
+from llm_client import ApiConfig
 import hybrid_alignment
 from hybrid_alignment import align_chapter_hybrid
 from paragraph_alignment import AlignmentBlock

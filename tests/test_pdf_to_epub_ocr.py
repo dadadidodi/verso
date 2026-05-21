@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import zipfile
 
-from chapter_catalog import extract_epub_document_from_bytes
+from epub_parser import extract_epub_document_from_bytes
 from tools.pdf_to_epub_ocr import ChapterDraft, convert_pdf_to_epub, write_preview
 
 

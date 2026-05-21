@@ -15,7 +15,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-from chapter_catalog import extract_epub_document_from_bytes
+from epub_parser import extract_epub_document_from_bytes
 from tools.pdf_text import looks_like_heading, read_tesseract_languages, split_pdf_paragraphs, text_quality_ok
 from utils import norm_space
 

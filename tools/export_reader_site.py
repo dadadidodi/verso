@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Sequence
 
-from storage_v2 import VersoStore
+from storage import VersoStore
 
 
 READER_INDEX_HTML = """<!doctype html>

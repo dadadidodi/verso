@@ -6,7 +6,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from document_parser import detect_source_format, extract_document_from_bytes
+from book_import import detect_source_format, extract_document_from_bytes
 from web_server import create_app
 
 

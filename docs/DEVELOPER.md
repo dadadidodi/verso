@@ -7,11 +7,11 @@
 | 你想理解什么 | 入口 |
 | --- | --- |
 | 本地 FastAPI app 和 API | `web_server.py` |
-| SQLite、storage、project/book/alignment 状态 | `storage_v2.py` |
-| EPUB 解析 | `document_parser.py`, `chapter_catalog.py` |
+| SQLite、storage、project/book/alignment 状态 | `storage.py` |
+| EPUB 解析 | `book_import.py`, `epub_parser.py` |
 | 实验性 PDF→EPUB 离线转换 | `tools/pdf_to_epub_ocr.py`, `tools/pdf_text.py` |
 | 章节和段落对齐 | `hybrid_alignment.py`, `paragraph_alignment.py` |
-| LLM 配置和调用 | `alignment_common.py` |
+| LLM 配置和调用 | `llm_client.py` |
 | 通用 env/text/JSON helpers | `utils.py` |
 | server event logging | `server_events.py` |
 | 本地网页 UI | `index.html`, `app.js`, `styles.css` |
@@ -108,7 +108,7 @@ node --check dist-reader/reader.js
 
 重要测试：
 
-- `tests/test_v2_api.py`：book/project/mapping/alignment/anchor/job API。
+- `tests/test_api.py`：book/project/mapping/alignment/anchor/job API。
 - `tests/test_middlemarch_ch1_alignment.py`：Middlemarch 第一章段落对齐回归。
 - `tests/test_hybrid_alignment_policy.py`：LLM policy、hard Anchor、missing-key 行为。
 - `tests/test_epub_footnotes.py`：EPUB footnote 过滤。

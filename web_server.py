@@ -15,12 +15,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from alignment_common import get_api_config
-from document_parser import detect_source_format
+from llm_client import get_api_config
+from book_import import detect_source_format
 from hybrid_alignment import align_chapter_hybrid, suggest_chapter_mappings
 from paragraph_alignment import AlignmentBlock, expand_en_ranges_from_blocks
 from server_events import append_server_event
-from storage_v2 import VersoStore
+from storage import VersoStore
 
 
 APP_ROOT = Path(__file__).resolve().parent

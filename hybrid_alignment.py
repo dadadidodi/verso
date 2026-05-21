@@ -5,7 +5,7 @@ from dataclasses import asdict
 from hashlib import sha256
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from alignment_common import ApiConfig
+from llm_client import ApiConfig
 from alignment_service import map_chapters_ai
 from paragraph_alignment import (
     AlignmentBlock,

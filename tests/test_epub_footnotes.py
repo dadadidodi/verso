@@ -9,7 +9,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from chapter_catalog import extract_epub_document_from_bytes, extract_paragraphs_from_html_text  # noqa: E402
+from epub_parser import extract_epub_document_from_bytes, extract_paragraphs_from_html_text  # noqa: E402
 
 CN_MIDDLEMARCH_EPUB = REPO_ROOT / "data" / "CnMiddlemarch.epub"
 

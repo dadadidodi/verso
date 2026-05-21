@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from storage_v2 import VersoStore
+from storage import VersoStore
 from tools.export_reader_site import export_reader_site, password_hash
 
 

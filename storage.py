@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
-from document_parser import (
+from book_import import (
     DocumentParseResult,
     chapter_from_dict,
     chapter_to_dict,

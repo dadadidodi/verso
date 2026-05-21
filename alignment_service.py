@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, List, Sequence, Tuple
 
-from alignment_common import ApiConfig, call_chat_json
+from llm_client import ApiConfig, call_chat_json
 from paragraph_alignment import (
     build_review_items,
     flatten_map_from_blocks,
