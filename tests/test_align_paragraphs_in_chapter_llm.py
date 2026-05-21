@@ -24,13 +24,14 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from alignment_common import get_api_config, load_env_file  # noqa: E402
+from alignment_common import get_api_config  # noqa: E402
 from paragraph_alignment import (  # noqa: E402
     AlignmentBlock,
     align_paragraphs_in_chapter_llm,
     flatten_map_from_blocks,
 )
 from tests.paragraph_loader import load_paragraphs_from_path  # noqa: E402
+from utils import load_env_file  # noqa: E402
 
 FIXTURES_DIR = REPO_ROOT / "tests" / "fixtures"
 

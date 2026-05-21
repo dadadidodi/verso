@@ -7,7 +7,7 @@
 verso 有两个 surface：
 
 - Local Align app：`web_server.py` 服务的本地完整应用，负责写入和修改数据。
-- Static Reader site：`export_reader_site.py` 生成的只读静态站，负责分享阅读内容。
+- Static Reader site：`tools/export_reader_site.py` 生成的只读静态站，负责分享阅读内容。
 
 Local Align app 是 source of truth。Static Reader 是从本地状态导出的 snapshot。
 
@@ -18,12 +18,12 @@ Local Align app 是 source of truth。Static Reader 是从本地状态导出的 
 | FastAPI app | `web_server.py` | 本地静态文件服务和 API |
 | Persistence | `storage_v2.py` | SQLite schema、migration、artifact path、project state |
 | EPUB parsing | `document_parser.py`, `chapter_catalog.py` | EPUB 到 paragraphs/chapters |
-| PDF tooling | `pdf_to_epub_ocr.py` | 一次性 PDF 到 EPUB |
-| LLM utilities | `alignment_common.py` | `.env`、OpenAI-compatible JSON call、LLM debug log |
+| PDF tooling | `tools/pdf_to_epub_ocr.py`, `tools/pdf_text.py` | 实验性离线 PDF→EPUB |
+| LLM utilities | `alignment_common.py`, `utils.py` | `.env`、OpenAI-compatible JSON call、LLM debug log |
 | Alignment | `hybrid_alignment.py`, `paragraph_alignment.py` | chapter mapping、block/range paragraph alignment、Anchor constraints |
 | Server events | `server_events.py` | JSONL decision/job/cache logging |
 | Local frontend | `index.html`, `app.js`, `frontend_logic.js`, `styles.css` | Library、Read Mode、Alignment Mode、Anchor UI |
-| Static export | `export_reader_site.py`, `publish_reader.sh` | Reader-only static assets |
+| Static export | `tools/export_reader_site.py`, `publish_reader.sh` | Reader-only static assets |
 
 ## Storage Model
 
@@ -55,7 +55,7 @@ paragraphs: list[str]
 chapters: list[{title, path, start, end}]
 ```
 
-章节和段落解析完成后，alignment engine 不关心原始来源是普通 EPUB 还是 PDF 转出的 EPUB。
+章节和段落解析完成后，alignment engine 不关心原始来源是普通 EPUB 还是 PDF 转出的 EPUB。PDF 转换质量通常偏低，所以这条路径只适合导入前救急，不能当作可靠的 parser 输入。
 
 ## Public API Shape
 
@@ -183,7 +183,7 @@ Including `llm_policy` prevents `force` and `off` from accidentally reusing inco
 
 ## Static Reader Export Shape
 
-`export_reader_site.py` reads local storage and writes:
+`tools/export_reader_site.py` reads local storage and writes:
 
 - `dist-reader/index.html`
 - `dist-reader/reader.css`
@@ -209,6 +209,6 @@ It intentionally excludes metrics, decision logs, anchors, jobs, source EPUBs, S
 
 - Local Align app has no authentication and should remain local.
 - Static Reader password is a lightweight frontend gate, not strong security.
-- Alignment quality depends on EPUB/PDF extraction quality.
+- Alignment quality depends on extraction quality. EPUB is the intended input; PDF→EPUB is experimental and often needs manual cleanup.
 - Translator notes embedded as normal body paragraphs can still confuse alignment; use hard Anchors to correct those cases.
 - Background jobs are in-process, not a production queue.

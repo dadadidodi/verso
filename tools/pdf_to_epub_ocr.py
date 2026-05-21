@@ -15,9 +15,9 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-from alignment_common import norm_space
 from chapter_catalog import extract_epub_document_from_bytes
-from document_parser import _looks_like_heading, _read_tesseract_languages, _split_pdf_paragraphs, _text_quality_ok
+from tools.pdf_text import looks_like_heading, read_tesseract_languages, split_pdf_paragraphs, text_quality_ok
+from utils import norm_space
 
 
 TOOL_VERSION = "pdf_to_epub_ocr_v1"
@@ -154,7 +154,7 @@ def extract_pdf_page_records(
     warnings: List[str] = []
     selected_ocr_lang = ocr_lang.strip()
     if not selected_ocr_lang:
-        selected_ocr_lang, lang_warnings = _read_tesseract_languages(language)
+        selected_ocr_lang, lang_warnings = read_tesseract_languages(language)
         warnings.extend(lang_warnings)
     elif shutil.which("tesseract") is None:
         warnings.append("tesseract binary not found; OCR pages will be marked failed")
@@ -180,7 +180,7 @@ def extract_pdf_page_records(
 def extract_single_page(page: Any, *, page_number: int, ocr_lang: str, scale: float) -> PageRecord:
     text = page.get_text("text") or ""
     text = clean_unicode(text)
-    if _text_quality_ok(text):
+    if text_quality_ok(text):
         return PageRecord(page_number=page_number, source="text_layer", text=text)
     if not ocr_lang:
         return PageRecord(
@@ -239,7 +239,7 @@ def build_chapters_from_pages(
     toc: List[List[Any]],
     max_pages: Optional[int],
 ) -> List[ChapterDraft]:
-    page_paragraphs = {record.page_number: _split_pdf_paragraphs(record.text) for record in page_records}
+    page_paragraphs = {record.page_number: split_pdf_paragraphs(record.text) for record in page_records}
     max_page = page_records[-1].page_number
     if toc:
         chapters: List[ChapterDraft] = []
@@ -292,7 +292,7 @@ def build_fallback_chapters(
             flat.append((record.page_number, paragraph))
     if not flat:
         return []
-    heading_positions = [idx for idx, (_, paragraph) in enumerate(flat) if _looks_like_heading(paragraph)]
+    heading_positions = [idx for idx, (_, paragraph) in enumerate(flat) if looks_like_heading(paragraph)]
     if heading_positions:
         if heading_positions[0] != 0:
             heading_positions.insert(0, 0)
@@ -301,7 +301,7 @@ def build_fallback_chapters(
             end = heading_positions[pos + 1] - 1 if pos + 1 < len(heading_positions) else len(flat) - 1
             page_start = flat[start][0]
             page_end = flat[end][0]
-            raw_title = flat[start][1] if _looks_like_heading(flat[start][1]) else f"PDF Section {pos + 1}"
+            raw_title = flat[start][1] if looks_like_heading(flat[start][1]) else f"PDF Section {pos + 1}"
             paragraphs = [paragraph for _, paragraph in flat[start : end + 1]]
             chapters.append(ChapterDraft(title=raw_title, page_start=page_start, page_end=page_end, paragraphs=paragraphs))
         return chapters

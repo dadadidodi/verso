@@ -11,11 +11,12 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from alignment_common import get_api_config, load_env_file  # noqa: E402
+from alignment_common import get_api_config  # noqa: E402
 from chapter_catalog import extract_epub_document_from_bytes  # noqa: E402
 from hybrid_alignment import align_chapter_hybrid  # noqa: E402
 from paragraph_alignment import AlignmentBlock, expand_en_ranges_from_blocks  # noqa: E402
 from tests.paragraph_loader import load_paragraphs_from_path  # noqa: E402
+from utils import load_env_file  # noqa: E402
 
 
 FIXTURES_DIR = REPO_ROOT / "tests" / "fixtures"

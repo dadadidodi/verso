@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import threading
 import urllib.error
 import urllib.request
@@ -10,6 +9,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
+
+from utils import env_flag, env_path, load_env_file
 
 _llm_debug_lock = threading.Lock()
 
@@ -19,21 +20,6 @@ class ApiConfig:
     api_base_url: str
     api_key: str
     model: str
-
-
-def load_env_file(path: str = ".env") -> None:
-    env_path = Path(path)
-    if not env_path.exists() or not env_path.is_file():
-        return
-    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip("'").strip('"')
-        if key:
-            os.environ.setdefault(key, value)
 
 
 def get_api_config(
@@ -49,32 +35,12 @@ def get_api_config(
     )
 
 
-def norm_space(text: str) -> str:
-    return re.sub(r"\s+", " ", text).strip()
-
-
-def safe_json_int(val: object, default: int = 0) -> int:
-    """JSON 里可能出现 null；dict.get('k', 0) 在键存在且值为 null 时仍会返回 None。"""
-    if val is None:
-        return default
-    try:
-        return int(val)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        return default
-
-
 def is_llm_debug_enabled() -> bool:
-    load_env_file()
-    v = os.getenv("VERSO_LLM_DEBUG", "").strip().lower()
-    return v in ("1", "true", "yes", "on")
+    return env_flag("VERSO_LLM_DEBUG")
 
 
 def _llm_debug_file_path() -> Path:
-    load_env_file()
-    custom = os.getenv("VERSO_LLM_DEBUG_FILE", "").strip()
-    if custom:
-        return Path(custom)
-    return Path("log") / "llm_debug.log"
+    return env_path("VERSO_LLM_DEBUG_FILE", Path("log") / "llm_debug.log")
 
 
 def append_llm_debug_record(

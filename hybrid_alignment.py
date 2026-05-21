@@ -5,7 +5,7 @@ from dataclasses import asdict
 from hashlib import sha256
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from alignment_common import ApiConfig, norm_space
+from alignment_common import ApiConfig
 from alignment_service import map_chapters_ai
 from paragraph_alignment import (
     AlignmentBlock,
@@ -15,6 +15,7 @@ from paragraph_alignment import (
     flatten_map_from_blocks,
     refine_large_blocks_llm,
 )
+from utils import norm_space
 
 
 CHINESE_NUMS = {

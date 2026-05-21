@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Dict, Iterator, List, Optional, Tuple
 
-from alignment_common import norm_space
+from utils import norm_space
 
 
 NS_CONTAINER = {"c": "urn:oasis:names:tc:opendocument:xmlns:container"}

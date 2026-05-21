@@ -35,7 +35,7 @@ if [[ -n "${VERSO_READER_PASSWORDS:-}" ]]; then
   done
 fi
 
-python3 export_reader_site.py "${ARGS[@]}"
+python3 -m tools.export_reader_site "${ARGS[@]}"
 
 echo
 echo "Reader site exported to ${OUT_DIR}."

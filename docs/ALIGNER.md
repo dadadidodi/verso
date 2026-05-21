@@ -134,10 +134,12 @@ Mismatch report 只是记录反馈。它不会自动改变结果，适合在阅�
 
 网页只上传 EPUB。
 
-如果源文件是 PDF，先用本地工具转成 EPUB。把下面的 `path/to/book.pdf` 换成你自己的 PDF 路径：
+PDF→EPUB 是实验性的离线预处理，不是正式导入能力。转换准确率通常偏低，扫描版、双栏、复杂脚注、页眉页脚、图片文字和古怪排版尤其容易出错；转完后一定要检查 preview、章节切分和正文段落，再决定要不要上传到 Library。
+
+如果仍然要试，把下面的 `path/to/book.pdf` 换成你自己的 PDF 路径：
 
 ```bash
-python3 pdf_to_epub_ocr.py path/to/book.pdf \
+python3 -m tools.pdf_to_epub_ocr path/to/book.pdf \
   --language zh \
   --title 书名 \
   --out path/to/book.ocr.epub \
@@ -146,4 +148,4 @@ python3 pdf_to_epub_ocr.py path/to/book.pdf \
   --scale 1.0
 ```
 
-检查生成的 preview 后，把生成的 EPUB 上传到 Library。
+检查生成的 preview 后，把生成的 EPUB 上传到 Library。质量不够时，优先找更干净的 EPUB 来源。

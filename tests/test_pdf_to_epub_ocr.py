@@ -5,7 +5,7 @@ from pathlib import Path
 import zipfile
 
 from chapter_catalog import extract_epub_document_from_bytes
-from pdf_to_epub_ocr import ChapterDraft, convert_pdf_to_epub, write_preview
+from tools.pdf_to_epub_ocr import ChapterDraft, convert_pdf_to_epub, write_preview
 
 
 def _simple_text_pdf(text: str) -> bytes:

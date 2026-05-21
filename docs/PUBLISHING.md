@@ -89,7 +89,7 @@ for item in manifest.get("reader_password_hashes") or [manifest["reader_password
     print("--reader-password-hash", item)
 PY
 
-python3 export_reader_site.py --project-id PROJECT_ID --out dist-reader $(cat /tmp/verso_reader_hash_args.txt)
+python3 -m tools.export_reader_site --project-id PROJECT_ID --out dist-reader $(cat /tmp/verso_reader_hash_args.txt)
 npx vercel deploy dist-reader --prod
 ```
 

@@ -1091,7 +1091,7 @@ async function uploadBook() {
     return;
   }
   if (!file.name.toLowerCase().endsWith(".epub")) {
-    setStatus("书库现在只接受 EPUB。PDF 请先用 pdf_to_epub_ocr.py 本地转换成 EPUB。", true);
+    setStatus("书库只接受 EPUB。PDF 离线转换准确率偏低；如需救急，可先用 python3 -m tools.pdf_to_epub_ocr 转成 EPUB 后人工检查。", true);
     return;
   }
   setBusyStatus(`正在上传并解析 ${file.name}...`);

@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from export_reader_site import export_reader_site, password_hash
 from storage_v2 import VersoStore
+from tools.export_reader_site import export_reader_site, password_hash
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]

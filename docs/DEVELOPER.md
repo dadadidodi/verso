@@ -9,13 +9,14 @@
 | 本地 FastAPI app 和 API | `web_server.py` |
 | SQLite、storage、project/book/alignment 状态 | `storage_v2.py` |
 | EPUB 解析 | `document_parser.py`, `chapter_catalog.py` |
-| PDF 转 EPUB 工具 | `pdf_to_epub_ocr.py` |
+| 实验性 PDF→EPUB 离线转换 | `tools/pdf_to_epub_ocr.py`, `tools/pdf_text.py` |
 | 章节和段落对齐 | `hybrid_alignment.py`, `paragraph_alignment.py` |
 | LLM 配置和调用 | `alignment_common.py` |
+| 通用 env/text/JSON helpers | `utils.py` |
 | server event logging | `server_events.py` |
 | 本地网页 UI | `index.html`, `app.js`, `styles.css` |
 | 可测试的前端纯逻辑 | `frontend_logic.js` |
-| 静态 Reader 导出 | `export_reader_site.py`, `publish_reader.sh` |
+| 静态 Reader 导出 | `tools/export_reader_site.py`, `publish_reader.sh` |
 
 ## 本地运行
 
@@ -73,7 +74,7 @@ EPUB upload
 
 ```text
 local storage/app.db + artifacts
--> export_reader_site.py
+-> tools/export_reader_site.py
 -> dist-reader/
 -> Vercel/static hosting
 ```
@@ -125,14 +126,16 @@ node --check dist-reader/reader.js
 
 如果想知道某章为什么走 heuristic、LM、mixed 或 fallback，优先看 `server_events.log`。
 
-## PDF 开发路径
+## PDF 离线转换开发路径
 
 网页只接受 EPUB。
 
-PDF 支持通过本地工具完成。把下面的 `path/to/book.pdf` 换成你自己的 PDF 路径：
+PDF→EPUB 只是实验性的本地预处理工具，不代表主应用支持 PDF。转换质量经常受 OCR、排版、脚注、页眉页脚和扫描质量影响，准确率偏低；生成结果必须通过 `preview.md` 和上传后的章节/段落检查。
+
+把下面的 `path/to/book.pdf` 换成你自己的 PDF 路径：
 
 ```bash
-python3 pdf_to_epub_ocr.py path/to/book.pdf \
+python3 -m tools.pdf_to_epub_ocr path/to/book.pdf \
   --language zh \
   --title 书名 \
   --out path/to/book.ocr.epub \
