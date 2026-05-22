@@ -1,38 +1,40 @@
-# verso
+# verso 对页
 
-verso 是一个双语阅读和翻译校对工具：把中文译文和英文原文按章节、段落对齐，让读者主要读中文，在觉得译文不可靠时快速查看对应英文。它的核心不是“并排对照”，而是“中文主读 + 原文查阅”。内容制作和校对在本地完成，最后可以导出一个只读的静态 Reader 网站分享给别人。
+verso 是一个面向文学译本的双语阅读和校对工具：让读者主要读中文译文，在觉得译文不可靠时快速查看对应英文原文。
 
-当前 UI slogan：`这要命的译文！！！`
+> 想先知道这个项目能做什么？直接看图文版：[verso 对页使用指南](docs/USER_GUIDE.md)。
 
-## 它现在能提供什么
+## 它能做什么
 
-- 读者可以打开一个 reader-only 网站，输入阅读密码，按章节阅读中文译文。
-- 点击中文段落时，Reader 会显示匹配到的英文原文 block 和少量上下文。
-- 项目 owner 可以在本地上传 EPUB、创建中英项目、生成章节映射、做段落对齐、人工加 Anchor 修正错配。
-- 对齐结果会存到本地，确认或 draft 的章节都可以导出到静态 Reader。
-- PDF 不直接上传到网页。仓库里有一个实验性的本地 PDF→EPUB 转换工具，但准确率通常偏低；只适合救急，转换后必须人工检查章节、段落和 OCR 文本。
+- 在本地上传中文 EPUB 和英文 EPUB，创建一个中英项目。
+- 用「校对模式」检查章节配对、生成段落对齐、添加「固定对应」修正错配。
+- 用「阅读模式」模拟最终阅读体验：读中文，点击段落查看对应英文。
+- 把校对好的内容导出成只读静态 Reader 网站，分享给朋友阅读。
+- 保持制作工具和阅读网站分离：本地 app 可写，Reader site 只读。
 
-## 你是谁？
+## 你应该先看哪篇文档
 
-| 你的目标 | 先看这里 |
+| 你的目标 | 入口 |
 | --- | --- |
-| 我想看图文版完整使用流程 | [docs/USER_GUIDE.md](docs/USER_GUIDE.md) |
-| 我是阅读者/朋友，只想知道怎么读 | [docs/READER.md](docs/READER.md) |
-| 我是项目 owner，要制作和校对对齐内容 | [docs/ALIGNER.md](docs/ALIGNER.md) |
-| 我要把 Reader 网站发布出去 | [docs/PUBLISHING.md](docs/PUBLISHING.md) |
-| 我是 developer，要理解设计或继续开发 | [docs/DEVELOPER.md](docs/DEVELOPER.md) |
-| 我要看更底层的技术架构 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| 我只是想快速了解 verso 长什么样、能做什么 | [图文使用指南](docs/USER_GUIDE.md) |
+| 我只想读别人分享的 Reader 网站 | [Reader 使用说明](docs/READER.md) |
+| 我要制作、校对、修正一本书 | [Aligner 使用说明](docs/ALIGNER.md) |
+| 我要把 Reader 网站发布出去 | [发布静态 Reader](docs/PUBLISHING.md) |
+| 我要继续开发或跑测试 | [Developer Guide](docs/DEVELOPER.md) |
+| 我要看 API、数据模型和架构 | [Architecture](docs/ARCHITECTURE.md) |
 
-## 两套网站
+完整文档地图见 [docs/README.md](docs/README.md)。
 
-verso 有两个明确分开的使用形态：
+## 两个使用界面
 
-- 本地 Align app：运行在 `localhost:8000`，私有、可写、有 Library、Read Mode、Alignment Mode、上传、删除、章节映射、段落对齐、Anchor、后台任务和可选 LLM 调用。
-- 静态 Reader site：从本地项目导出到 `dist-reader/` 后部署，供别人阅读，只读、有前端轻密码、没有 Align Mode、没有上传/删除/LLM/SQLite/log/source EPUB。
+verso 有两个明确分开的形态：
+
+- 本地 Align app：私有制作工具，运行在 `localhost`，包含书库、阅读模式、校对模式、上传、删除、章节配对、段落对齐、固定对应、后台任务和可选 LLM 调用。
+- 静态 Reader site：从本地项目导出的只读网站，供别人阅读，有轻密码、章节阅读和点击查原文，没有上传、删除、校对、LLM 或数据库。
 
 不要把本地 Align app 公开部署。要分享内容时，只发布静态 Reader site。
 
-## 最快开始
+## 本地运行
 
 安装依赖：
 
@@ -48,7 +50,7 @@ python3 -m pip install -r requirements-dev.txt
 
 默认地址是 [http://localhost:8000](http://localhost:8000)。
 
-如果需要 LLM 章节映射或更好的段落对齐，在本地 `.env` 放入：
+如果需要 LLM 章节配对或更好的段落对齐，在本地 `.env` 放入：
 
 ```env
 OPENAI_API_KEY=your-key-here
@@ -58,9 +60,9 @@ OPENAI_MODEL=gpt-4.1
 
 不要提交 `.env`、`storage/`、`log/` 或 `dist-reader/`。
 
-## 最短发布提示
+## 导出 Reader
 
-先在本地 Align app 里完成对齐，再导出 reader-only 网站：
+先在本地 Align app 里完成校对，再导出只读 Reader：
 
 ```bash
 VERSO_READER_PASSWORDS="private-password,friend-password" ./publish_reader.sh PROJECT_ID
@@ -73,7 +75,3 @@ npx vercel deploy dist-reader --prod
 ```
 
 完整流程见 [docs/PUBLISHING.md](docs/PUBLISHING.md)。
-
-## 文档目录
-
-完整文档入口在 [docs/README.md](docs/README.md)。

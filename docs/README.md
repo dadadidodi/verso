@@ -1,21 +1,23 @@
 # verso Docs
 
-这里按“你想做什么”组织文档，而不是按文件类型组织。
+文档按“你想做什么”组织。第一次了解项目，优先看 [USER_GUIDE.md](USER_GUIDE.md)：它用实际宽版截图说明 verso 的阅读和校对工作流。
 
-| 目标 | 文档 |
-| --- | --- |
-| 想看图文版完整使用流程 | [USER_GUIDE.md](USER_GUIDE.md) |
-| 只想读别人分享的 Reader 网站 | [READER.md](READER.md) |
-| 想制作、校对、修正对齐内容 | [ALIGNER.md](ALIGNER.md) |
-| 想导出并部署静态 Reader | [PUBLISHING.md](PUBLISHING.md) |
-| 想继续开发、跑测试、看代码入口 | [DEVELOPER.md](DEVELOPER.md) |
-| 想看数据模型/API/alignment engine 设计 | [ARCHITECTURE.md](ARCHITECTURE.md) |
+## 推荐阅读路径
+
+| 你是谁 | 先看 | 用途 |
+| --- | --- | --- |
+| 第一次看到这个项目 | [USER_GUIDE.md](USER_GUIDE.md) | 看图了解 verso 能做什么，以及本地制作工具和阅读模式怎么配合 |
+| 只负责阅读 | [READER.md](READER.md) | 学会打开 Reader、阅读中文、点击查看英文原文 |
+| 项目 owner | [ALIGNER.md](ALIGNER.md) | 制作项目、检查章节配对、修正段落对齐、确认章节 |
+| 发布者 | [PUBLISHING.md](PUBLISHING.md) | 导出并部署只读静态 Reader |
+| 开发者 | [DEVELOPER.md](DEVELOPER.md) | 找代码入口、运行本地 app、跑测试 |
+| 想看底层设计 | [ARCHITECTURE.md](ARCHITECTURE.md) | 理解 API、数据模型、alignment engine 和导出边界 |
 
 ## 先记住这件事
 
-verso 不是一个单一网站。
+verso 不是一个单一网站：
 
-- 本地 Align app 是制作工具：私有、本地、可写、有 LLM、有 Alignment Mode。
-- 静态 Reader site 是阅读产品：可分享、只读、轻密码、没有 Alignment Mode。
+- 本地 Align app 是制作工具：私有、本地、可写，有阅读模式、校对模式、LLM、固定对应和后台任务。
+- 静态 Reader site 是阅读产品：可分享、只读、轻密码，没有校对模式，也不包含源 EPUB、SQLite、log 或 `.env`。
 
-如果你是新用户，先从 [README.md](../README.md) 看起。如果你是项目 owner，优先看图文版 [USER_GUIDE.md](USER_GUIDE.md)，再按需要查 [ALIGNER.md](ALIGNER.md)。
+要分享内容时，只发布静态 Reader site，不要公开部署本地 Align app。
