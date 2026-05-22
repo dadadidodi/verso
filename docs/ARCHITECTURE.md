@@ -1,15 +1,15 @@
 # Architecture
 
-这份文档是技术深水区。使用流程看 [ALIGNER.md](ALIGNER.md)，发布流程看 [PUBLISHING.md](PUBLISHING.md)，开发入口看 [DEVELOPER.md](DEVELOPER.md)。
+这份文档是技术深水区。校对流程看 [ALIGNER.md](ALIGNER.md)，发布流程看 [PUBLISHING.md](PUBLISHING.md)，开发入口看 [DEVELOPER.md](DEVELOPER.md)。
 
 ## 系统边界
 
-verso 有两个 surface：
+verso 有两个运行形态：
 
-- Local Align app：`web_server.py` 服务的本地完整应用，负责写入和修改数据。
+- verso workspace：`web_server.py` 服务的本地完整应用，负责写入和修改数据。
 - Static Reader site：`tools/export_reader_site.py` 生成的只读静态站，负责分享阅读内容。
 
-Local Align app 是 source of truth。Static Reader 是从本地状态导出的 snapshot。
+verso workspace 是 source of truth。Static Reader 是从本地状态导出的 snapshot。
 
 ## Runtime Stack
 
@@ -207,7 +207,7 @@ It intentionally excludes metrics, decision logs, anchors, jobs, source EPUBs, S
 
 ## Known Limits
 
-- Local Align app has no authentication and should remain local.
+- verso workspace has no authentication and should remain local.
 - Static Reader password is a lightweight frontend gate, not strong security.
 - Alignment quality depends on extraction quality. EPUB is the intended input; PDF→EPUB is experimental and often needs manual cleanup.
 - Translator notes embedded as normal body paragraphs can still confuse alignment; use hard Anchors to correct those cases.

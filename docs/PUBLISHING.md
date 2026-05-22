@@ -1,10 +1,10 @@
 # 发布静态 Reader
 
-这份文档给项目 owner：你已经在本地 Align app 里做好对齐，现在想把只读 Reader 网站分享给别人。
+这份文档给项目 owner：你已经在 verso 工作台里做好对齐，现在想把只读 Reader 网站分享给别人。
 
 ## 发布的是哪一个网站
 
-发布的是静态 Reader site，不是本地 Align app。
+发布的是静态 Reader site，不是 verso 工作台。
 
 静态 Reader site 包含：
 
@@ -16,15 +16,15 @@
 
 静态 Reader site 不包含：
 
-- Alignment Mode。
-- Library。
+- 校对模式。
+- 书库。
 - 上传或删除功能。
-- Anchor 编辑。
+- 固定对应编辑。
 - 后台任务。
-- source EPUB。
+- 源 EPUB。
 - SQLite 数据库。
 - `.env` 或 OpenAI key。
-- 本地 log 或 LLM debug prompt。
+- 本地日志或 LLM 调试提示词。
 
 ## 密码模型
 
@@ -34,7 +34,7 @@ Reader 可以配置一个或多个阅读密码。
 
 ## 第一次导出
 
-确认本地项目已经有 draft 或 confirmed 章节，然后运行：
+确认本地项目已经有 draft 或 confirmed 章节，然后运行。draft 和 confirmed 都会导出；skipped 章节不会导出。
 
 ```bash
 VERSO_READER_PASSWORDS="private-password,friend-password" ./publish_reader.sh PROJECT_ID
@@ -106,16 +106,16 @@ npx vercel deploy dist-reader --prod
 
 ## 手机阅读表现
 
-桌面端保持中文正文和右侧英文 lookup。
+桌面端保持中文正文和右侧英文原文。
 
 手机端会把中文正文作为主页面。点击中文段落后，英文原文从底部弹出；关闭后中文阅读位置不跳。
 
 ## 发布前检查
 
 1. 本地打开 `dist-reader/`。
-2. 测试所有 reader passwords。
+2. 测试所有阅读密码。
 3. 确认章节数量符合预期。
 4. 确认手机宽度下底部原文抽屉可用。
-5. 确认 `dist-reader/` 没有 source EPUB、SQLite、log 或 `.env`。
+5. 确认 `dist-reader/` 没有源 EPUB、SQLite、日志或 `.env`。
 6. 部署到 Vercel。
 7. 打开 stable alias 再测试一次。

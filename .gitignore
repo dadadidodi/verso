@@ -1,5 +1,7 @@
 .env
 .DS_Store
+*.swp
+*.swo
 log/
 .pycache/
 __pycache__/
