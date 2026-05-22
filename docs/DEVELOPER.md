@@ -59,7 +59,7 @@ OPENAI_MODEL=gpt-4.1
 
 ## 数据流速览
 
-本地制作流程：
+工作台数据流：
 
 ```text
 EPUB upload
@@ -67,7 +67,7 @@ EPUB upload
 -> project chapter mapping
 -> chapter alignment blocks
 -> en_ranges_by_zh + local_sync_map
--> Read Mode / static Reader export
+-> 阅读模式 / 静态 Reader 导出
 ```
 
 静态发布流程：

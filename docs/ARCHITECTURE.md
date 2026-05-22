@@ -22,7 +22,7 @@ verso workspace 是 source of truth。Static Reader 是从本地状态导出的 
 | LLM utilities | `llm_client.py`, `utils.py` | `.env`、OpenAI-compatible JSON call、LLM debug log |
 | Alignment | `hybrid_alignment.py`, `paragraph_alignment.py` | chapter mapping、block/range paragraph alignment、Anchor constraints |
 | Server events | `server_events.py` | JSONL decision/job/cache logging |
-| Local frontend | `index.html`, `app.js`, `frontend_logic.js`, `styles.css` | Library、Read Mode、Alignment Mode、Anchor UI |
+| Local frontend | `index.html`, `app.js`, `frontend_logic.js`, `styles.css` | 书库、阅读模式、校对模式、固定对应 UI |
 | Static export | `tools/export_reader_site.py`, `publish_reader.sh` | Reader-only static assets |
 
 ## Storage Model
@@ -33,8 +33,8 @@ verso workspace 是 source of truth。Static Reader 是从本地状态导出的 
 
 - `books`：source metadata、language、title、content hash、source path。
 - `book_artifacts`：parser artifacts 和 stats。
-- `projects`：一个中文 book 和一个英文 book 的 pairing。
-- `chapter_mappings`：中文 chapter index 到英文 chapter index。
+- `projects`：一个译文 book 和一个原文 book 的 pairing。
+- `chapter_mappings`：译文章节 index 到原文章节 index。
 - `chapter_alignments`：每章 alignment state、blocks、sync map、review items、metrics、cache key。
 - `anchors`：hard anchors 和 mismatch reports。
 - `jobs`：prefetch 和 align-remaining background jobs。
@@ -116,8 +116,8 @@ Paragraph alignment is block/range based.
 Canonical fields:
 
 - `blocks`：semantic truth，1-based `zh_start`, `zh_end`, `en_start`, `en_end`。
-- `en_ranges_by_zh`：0-based English range per Chinese paragraph，用于 UI 语义高亮。
-- `local_sync_map`：0-based English point projection，只用于 scroll sync 和兼容旧逻辑。
+- `en_ranges_by_zh`：每个译文段落对应的 0-based 原文范围，用于 UI 语义高亮。
+- `local_sync_map`：0-based 原文位置投影，只用于 scroll sync 和兼容旧逻辑。
 - `review_items`：低置信或可疑 spans。
 - `metrics`：alignment source、decision log、LLM/heuristic counts、fallback reason。
 
@@ -172,8 +172,8 @@ They do not affect alignment automatically.
 
 Chapter alignment cache keys include:
 
-- Chinese chapter text hash.
-- mapped English chapter text hash.
+- Translation chapter text hash.
+- mapped original chapter text hash.
 - hard Anchor ranges.
 - engine version.
 - prompt version.

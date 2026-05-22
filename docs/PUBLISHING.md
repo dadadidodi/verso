@@ -24,7 +24,7 @@
 - 源 EPUB。
 - SQLite 数据库。
 - `.env` 或 OpenAI key。
-- 本地日志或 LLM 调试提示词。
+- 本地日志或 AI 调试提示词。
 
 ## 密码模型
 
@@ -34,7 +34,7 @@ Reader 可以配置一个或多个阅读密码。
 
 ## 第一次导出
 
-确认本地项目已经有 draft 或 confirmed 章节，然后运行。draft 和 confirmed 都会导出；skipped 章节不会导出。
+确认本地项目已经有「待确认」或「已确认」章节，然后运行。「待确认」（draft）和「已确认」（confirmed）章节都会导出；「已跳过」（skipped）章节不会导出。
 
 ```bash
 VERSO_READER_PASSWORDS="private-password,friend-password" ./publish_reader.sh PROJECT_ID
@@ -106,9 +106,9 @@ npx vercel deploy dist-reader --prod
 
 ## 手机阅读表现
 
-桌面端保持中文正文和右侧英文原文。
+桌面端保持译文正文和右侧原文。
 
-手机端会把中文正文作为主页面。点击中文段落后，英文原文从底部弹出；关闭后中文阅读位置不跳。
+手机端会把译文正文作为主页面。点击译文段落后，原文从底部弹出；关闭后译文阅读位置不跳。
 
 ## 发布前检查
 
