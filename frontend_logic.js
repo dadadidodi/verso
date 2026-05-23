@@ -91,12 +91,12 @@
       return "阅读模式不编辑固定对应。";
     }
     if (!anchorModeEnabled) {
-      return "开启后点选连续中文段，再在右侧原文框点选对应英文段。";
+      return "开启后点选连续译文段，再在右侧原文框点选对应原文段。";
     }
     if (pendingZhAnchor === null || pendingZhAnchor === undefined) {
-      return "请选择中文起始段。";
+      return "请选择译文起始段。";
     }
-    return `已选中文第 ${pendingZhAnchor + 1} 段，请再次点击中文段确定范围。`;
+    return `已选译文第 ${pendingZhAnchor + 1} 段，请再次点击译文段确定范围。`;
   }
 
   function syncTargetIndex(syncMap, zhOffsets, scrollTop, clientHeight, reverseMap) {
@@ -136,7 +136,7 @@
   function formatEnglishRangeLabel(range) {
     const start = Number(range?.start ?? 0) + 1;
     const end = Number(range?.end ?? start - 1) + 1;
-    return start === end ? `英文 ${start}` : `英文 ${start}-${end}`;
+    return start === end ? `原文 ${start}` : `原文 ${start}-${end}`;
   }
 
   function englishContextWindow(enLength, range, before = 1, after = 1) {

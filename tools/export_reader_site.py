@@ -57,12 +57,12 @@ READER_INDEX_HTML = """<!doctype html>
           <div class="lookup-header">
             <h2>原文</h2>
             <div class="lookup-actions">
-              <span id="lookup-label" class="tag">EN</span>
+              <span id="lookup-label" class="tag">原文</span>
               <button id="lookup-close-btn" type="button" class="secondary-btn lookup-close-btn">关闭</button>
             </div>
           </div>
           <div id="lookup-content" class="scroll-panel lookup-content">
-            <p class="muted">点击中文段落查看对应英文原文。</p>
+            <p class="muted">点击译文段落查看对应原文。</p>
           </div>
         </aside>
       </section>
@@ -531,7 +531,7 @@ function englishContextWindow(enLength, range, before = 1, after = 1) {
 function formatEnglishRange(range) {
   const start = Number(range.start || 0) + 1;
   const end = Number(range.end ?? range.start ?? 0) + 1;
-  return start === end ? `EN ${start}` : `EN ${start}-${end}`;
+  return start === end ? `原文 ${start}` : `原文 ${start}-${end}`;
 }
 
 function renderManifest() {
@@ -540,7 +540,7 @@ function renderManifest() {
   els.chapterList.innerHTML = state.manifest.chapters
     .map((chapter) => {
       const active = chapter.chapter_index === state.currentChapterIndex ? " active" : "";
-      return `<button class="chapter-btn${active}" type="button" data-chapter-index="${chapter.chapter_index}">中${chapter.chapter_index + 1}. ${escapeHtml(chapter.zh_title || "Untitled")}</button>`;
+      return `<button class="chapter-btn${active}" type="button" data-chapter-index="${chapter.chapter_index}">译${chapter.chapter_index + 1}. ${escapeHtml(chapter.zh_title || "Untitled")}</button>`;
     })
     .join("");
 }
@@ -548,8 +548,8 @@ function renderManifest() {
 function renderLookup(range) {
   const chapter = state.currentChapter;
   if (!chapter || !range) {
-    els.lookupLabel.textContent = "EN";
-    els.lookupContent.innerHTML = `<p class="muted">点击中文段落查看对应英文原文。</p>`;
+    els.lookupLabel.textContent = "原文";
+    els.lookupContent.innerHTML = `<p class="muted">点击译文段落查看对应原文。</p>`;
     setLookupOpen(false);
     return;
   }
@@ -562,9 +562,9 @@ function renderLookup(range) {
       continue;
     }
     const active = enIndex >= range.start && enIndex <= range.end ? " active" : "";
-    lines.push(`<p class="lookup-para${active}"><span class="lookup-index">EN ${enIndex + 1}</span>${escapeHtml(text)}</p>`);
+    lines.push(`<p class="lookup-para${active}"><span class="lookup-index">原文 ${enIndex + 1}</span>${escapeHtml(text)}</p>`);
   }
-  els.lookupContent.innerHTML = lines.join("") || `<p class="muted">当前中文段暂无英文对应。</p>`;
+  els.lookupContent.innerHTML = lines.join("") || `<p class="muted">当前译文段暂无原文对应。</p>`;
   setLookupOpen(true);
 }
 
@@ -576,7 +576,7 @@ function renderChapter() {
     renderLookup(null);
     return;
   }
-  els.chapterTitle.textContent = `中${chapter.chapter_index + 1}《${chapter.zh_title || "Untitled"}》 ↔ 《${chapter.en_title || "Untitled"}》`;
+  els.chapterTitle.textContent = `译${chapter.chapter_index + 1}《${chapter.zh_title || "Untitled"}》 ↔ 原文《${chapter.en_title || "Untitled"}》`;
   els.zhContent.innerHTML = chapter.zh_paragraphs
     .map((text, index) => `<p class="para" data-index="${index}">${escapeHtml(text)}</p>`)
     .join("");
@@ -669,7 +669,7 @@ async function boot() {
   }
   state.manifest = await response.json();
   if (!state.manifest.chapters.length) {
-    els.loginPanel.innerHTML = `<h1>暂无可阅读章节</h1><p class="muted">请先在本地 Align app 确认章节后重新导出。</p>`;
+    els.loginPanel.innerHTML = `<h1>暂无可阅读章节</h1><p class="muted">请先在 verso 工作台确认章节后重新导出。</p>`;
     return;
   }
   if (isUnlocked()) {

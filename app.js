@@ -191,7 +191,7 @@ function fmtTag(stateName) {
 }
 
 function languageLabel(language) {
-  return language === "zh" ? "中文" : language === "en" ? "英文" : String(language || "未知语言").toUpperCase();
+  return language === "zh" ? "译文" : language === "en" ? "原文" : String(language || "未知语言").toUpperCase();
 }
 
 function projectStatusLabel(status) {
@@ -290,10 +290,10 @@ function renderBookOptions() {
   const enBooks = state.books.filter((book) => book.language === "en");
   els.zhBookSelect.innerHTML = zhBooks.length
     ? zhBooks.map((book) => `<option value="${book.id}">${escapeHtml(bookLabel(book))}</option>`).join("")
-    : `<option value="">暂无中文书</option>`;
+    : `<option value="">暂无译文书</option>`;
   els.enBookSelect.innerHTML = enBooks.length
     ? enBooks.map((book) => `<option value="${book.id}">${escapeHtml(bookLabel(book))}</option>`).join("")
-    : `<option value="">暂无英文书</option>`;
+    : `<option value="">暂无原文书</option>`;
 }
 
 function renderBookList() {
@@ -319,7 +319,7 @@ function renderBookList() {
 
 function renderProjectList() {
   if (!state.projects.length) {
-    els.projectList.innerHTML = `<div class="list-card"><div class="meta-line">还没有项目。创建一个中英配对项目开始。</div></div>`;
+    els.projectList.innerHTML = `<div class="list-card"><div class="meta-line">还没有项目。创建一个译文/原文配对项目开始。</div></div>`;
     return;
   }
   els.projectList.innerHTML = state.projects
@@ -426,7 +426,7 @@ function renderProjectSummary() {
   const project = state.currentProject.project;
   els.projectTitle.textContent = `项目 #${project.id} · ${project.zh_title} ↔ ${project.en_title}`;
   els.projectSummary.textContent =
-    `${projectStatusLabel(project.status)} · 中文 ${stats.zh_chapter_count} 章 / ${stats.zh_paragraph_count} 段 · 英文 ${stats.en_chapter_count} 章 / ${stats.en_paragraph_count} 段 · 已确认 ${stats.confirmed_alignment_count} 章。`;
+    `${projectStatusLabel(project.status)} · 译文 ${stats.zh_chapter_count} 章 / ${stats.zh_paragraph_count} 段 · 原文 ${stats.en_chapter_count} 章 / ${stats.en_paragraph_count} 段 · 已确认 ${stats.confirmed_alignment_count} 章。`;
 }
 
 function renderChapterList() {
@@ -439,13 +439,13 @@ function renderChapterList() {
       const active = chapter.zh_chapter_index === state.currentChapterIndex ? "active" : "";
       const mapped = chapter.mapped_en_chapter_index === null || chapter.mapped_en_chapter_index === undefined
         ? "未映射"
-        : `英${chapter.mapped_en_chapter_index + 1} ${chapter.mapped_en_title || ""}`;
+        : `原${chapter.mapped_en_chapter_index + 1} ${chapter.mapped_en_title || ""}`;
       const alignmentLabel = Logic.alignmentStateLabel
         ? Logic.alignmentStateLabel(chapter.alignment_state, chapter.alignment_source)
         : alignmentStateText(chapter.alignment_state);
       return `
         <button class="chapter-card ${active}" type="button" data-chapter-index="${chapter.zh_chapter_index}">
-          <h4>中${chapter.zh_chapter_index + 1}. ${escapeHtml(chapter.zh_title || "未命名章节")}</h4>
+          <h4>译${chapter.zh_chapter_index + 1}. ${escapeHtml(chapter.zh_title || "未命名章节")}</h4>
           <div class="meta-line">${escapeHtml(mapped)}</div>
           <div class="meta-line">
             ${fmtTag(alignmentLabel)}
@@ -466,7 +466,7 @@ function renderMappingTable() {
   const enOptions = state.enChapterOptions
     .map((chapter) => {
       const title = chapter.title || "未命名章节";
-      return `<option value="${chapter.en_chapter_index}">${escapeHtml(`英${chapter.en_chapter_index + 1} · ${title}`)}</option>`;
+      return `<option value="${chapter.en_chapter_index}">${escapeHtml(`原${chapter.en_chapter_index + 1} · ${title}`)}</option>`;
     })
     .join("");
   els.mappingTable.innerHTML = chapters
@@ -477,7 +477,7 @@ function renderMappingTable() {
       return `
         <div class="mapping-row">
           <div>
-            <strong>中${chapter.zh_chapter_index + 1}. ${escapeHtml(chapter.zh_title || "未命名章节")}</strong>
+            <strong>译${chapter.zh_chapter_index + 1}. ${escapeHtml(chapter.zh_title || "未命名章节")}</strong>
             <div class="mapping-meta">来源：${escapeHtml(mappingSourceLabel(mapping?.source || "manual"))} · 置信度：${confidence === null || confidence === undefined ? "无" : Number(confidence).toFixed(3)}</div>
             <div class="mapping-meta">${escapeHtml(mapping?.reason || "")}</div>
           </div>
@@ -522,7 +522,7 @@ function renderAnchors() {
       (anchor) => `
         <div class="anchor-row">
           <div>
-            <strong>中${formatRangeLabel(Number(anchor.zh_start ?? anchor.zh_paragraph_index), Number(anchor.zh_end ?? anchor.zh_paragraph_index))} ↔ 英${formatRangeLabel(Number(anchor.en_start ?? anchor.en_paragraph_index), Number(anchor.en_end ?? anchor.en_paragraph_index))}</strong>
+            <strong>译${formatRangeLabel(Number(anchor.zh_start ?? anchor.zh_paragraph_index), Number(anchor.zh_end ?? anchor.zh_paragraph_index))} ↔ 原${formatRangeLabel(Number(anchor.en_start ?? anchor.en_paragraph_index), Number(anchor.en_end ?? anchor.en_paragraph_index))}</strong>
             <div class="meta-line">${anchor.kind === "hard" ? "人工固定" : escapeHtml(anchor.kind)} · ${anchor.confirmed ? "已生效" : "草稿"}${anchor.note ? ` · ${escapeHtml(anchor.note)}` : ""}</div>
           </div>
           <button type="button" data-anchor-id="${anchor.id}" class="secondary-btn">删除固定对应</button>
@@ -691,17 +691,17 @@ function updateAnchorHint() {
   if (state.mode !== "align") {
     els.anchorHint.textContent = "阅读模式不编辑固定对应。";
   } else if (!els.anchorMode.checked) {
-    els.anchorHint.textContent = "开启后点选连续中文段，再在右侧原文框点选对应英文段。";
+    els.anchorHint.textContent = "开启后点选连续译文段，再在右侧原文框点选对应原文段。";
   } else if (!hasZh) {
     els.anchorHint.textContent = draft.zhStart === null
-      ? "请选择中文起始段。"
-      : `已选中文第 ${draft.zhStart + 1} 段，请再次点击中文段确定范围。`;
+      ? "请选择译文起始段。"
+      : `已选译文第 ${draft.zhStart + 1} 段，请再次点击译文段确定范围。`;
   } else if (!hasEn) {
     els.anchorHint.textContent = draft.enStart === null
-      ? `已选中文 ${formatRangeLabel(draft.zhStart, draft.zhEnd)}，请在右侧原文框选择英文起始段。`
-      : `已选英文第 ${draft.enStart + 1} 段，请再次点击英文段确定范围。`;
+      ? `已选译文 ${formatRangeLabel(draft.zhStart, draft.zhEnd)}，请在右侧原文框选择原文起始段。`
+      : `已选原文第 ${draft.enStart + 1} 段，请再次点击原文段确定范围。`;
   } else {
-    els.anchorHint.textContent = `待保存固定对应：中 ${formatRangeLabel(draft.zhStart, draft.zhEnd)} ↔ 英 ${formatRangeLabel(draft.enStart, draft.enEnd)}`;
+    els.anchorHint.textContent = `待保存固定对应：译 ${formatRangeLabel(draft.zhStart, draft.zhEnd)} ↔ 原 ${formatRangeLabel(draft.enStart, draft.enEnd)}`;
   }
   if (els.createAnchorBtn) {
     els.createAnchorBtn.disabled = !(state.mode === "align" && els.anchorMode.checked && hasZh && hasEn);
@@ -768,9 +768,9 @@ function paragraphClass(side, localIndex) {
 
 function englishRangeLabel(range) {
   if (!range) {
-    return "英文";
+    return "原文";
   }
-  return Logic.formatEnglishRangeLabel ? Logic.formatEnglishRangeLabel(range) : `英文 ${range.start + 1}`;
+  return Logic.formatEnglishRangeLabel ? Logic.formatEnglishRangeLabel(range) : `原文 ${range.start + 1}`;
 }
 
 function renderLookupPanel() {
@@ -786,8 +786,8 @@ function renderLookupPanel() {
   els.lookupPanel.classList.remove("hidden");
   els.lookupContent.style.paddingTop = "0px";
   if (state.activeZhIndex === null || !state.activeEnRange) {
-    els.lookupLabel.textContent = "英文";
-    els.lookupContent.innerHTML = `<p class="muted">点击中文段落查看对应英文原文。</p>`;
+    els.lookupLabel.textContent = "原文";
+    els.lookupContent.innerHTML = `<p class="muted">点击译文段落查看对应原文。</p>`;
     if (els.reportMismatchBtn) {
       els.reportMismatchBtn.classList.add("hidden");
     }
@@ -810,13 +810,13 @@ function renderLookupPanel() {
       const classes = `${paragraphClass("en", enIndex)} lookup-para${active}`;
       lines.push(`
         <p class="${classes}" data-side="en" data-index="${enIndex}">
-          <span class="lookup-index">英文 ${enIndex + 1}</span>
+          <span class="lookup-index">原文 ${enIndex + 1}</span>
           ${escapeHtml(text)}
         </p>
       `);
     }
   }
-  els.lookupContent.innerHTML = lines.join("") || `<p class="muted">当前中文段暂无英文对应。</p>`;
+  els.lookupContent.innerHTML = lines.join("") || `<p class="muted">当前译文段暂无原文对应。</p>`;
   setLookupOpen(true);
   window.requestAnimationFrame(() => alignLookupToChinese());
 }
@@ -852,9 +852,9 @@ function renderReader() {
   if (!reader) {
     els.readerTitle.textContent = "阅读区";
     els.readerMeta.textContent = "当前项目还没有可加载的章节内容。";
-    els.zhScroll.innerHTML = `<p class="para">暂无中文内容。</p>`;
+    els.zhScroll.innerHTML = `<p class="para">暂无译文内容。</p>`;
     if (els.enScroll) {
-      els.enScroll.innerHTML = `<p class="para">暂无英文内容。</p>`;
+      els.enScroll.innerHTML = `<p class="para">暂无原文内容。</p>`;
     }
     state.zhOffsets = [];
     state.enOffsets = [];
@@ -867,8 +867,8 @@ function renderReader() {
     renderLookupPanel();
     return;
   }
-  els.readerTitle.textContent = `中${reader.chapter_index + 1}《${reader.zh_title || "未命名章节"}》 ↔ 英${reader.mapped_en_chapter_index + 1}《${reader.en_title || "未命名章节"}》`;
-  els.readerMeta.textContent = `对应状态：${alignmentStateText(reader.sync_source)} · 中文 ${reader.zh_paragraphs.length} 段 · 英文 ${reader.en_paragraphs.length} 段`;
+  els.readerTitle.textContent = `译${reader.chapter_index + 1}《${reader.zh_title || "未命名章节"}》 ↔ 原${reader.mapped_en_chapter_index + 1}《${reader.en_title || "未命名章节"}》`;
+  els.readerMeta.textContent = `对应状态：${alignmentStateText(reader.sync_source)} · 译文 ${reader.zh_paragraphs.length} 段 · 原文 ${reader.en_paragraphs.length} 段`;
   state.localSyncMap = Array.isArray(reader.local_sync_map) ? reader.local_sync_map : [];
   state.enRangesByZh = Array.isArray(reader.en_ranges_by_zh) ? reader.en_ranges_by_zh : [];
   state.enReverseMap = Logic.buildReverseMap
@@ -1114,7 +1114,7 @@ async function createProject() {
   const zhBookId = Number(els.zhBookSelect.value);
   const enBookId = Number(els.enBookSelect.value);
   if (!zhBookId || !enBookId) {
-    setStatus("请先选择一本文字中文书和一本英文书。", true);
+    setStatus("请先选择一本译文书和一本原文书。", true);
     return;
   }
   const payload = await api("/api/projects", {
@@ -1331,7 +1331,7 @@ async function createAnchorFromDraft() {
   state.pendingZhAnchor = null;
   state.anchorDraft = { zhStart: null, zhEnd: null, enStart: null, enEnd: null };
   await loadCurrentChapter();
-  setStatus(`已保存固定对应：中 ${formatRangeLabel(zhRange.start, zhRange.end)} ↔ 英 ${formatRangeLabel(enRange.start, enRange.end)}。`);
+  setStatus(`已保存固定对应：译 ${formatRangeLabel(zhRange.start, zhRange.end)} ↔ 原 ${formatRangeLabel(enRange.start, enRange.end)}。`);
 }
 
 async function reportMismatch() {
@@ -1609,7 +1609,7 @@ function handleParagraphClick(event, side) {
     return;
   }
   if (state.anchorDraft.zhStart === null || state.anchorDraft.zhEnd === null) {
-    setStatus("请先点击左侧中文段落两次，确定固定对应的中文范围。", true);
+    setStatus("请先点击左侧译文段落两次，确定固定对应的译文范围。", true);
     return;
   }
   if (state.anchorDraft.enStart === null || state.anchorDraft.enEnd !== null) {

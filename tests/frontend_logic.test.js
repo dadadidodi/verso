@@ -53,9 +53,9 @@ test("nextChapterIndex stays inside bounds", () => {
 
 test("anchorHint reflects read mode, empty align mode, and pending zh anchor", () => {
   assert.equal(Logic.anchorHint("read", false, null), "阅读模式不编辑固定对应。");
-  assert.equal(Logic.anchorHint("align", false, null), "开启后点选连续中文段，再在右侧原文框点选对应英文段。");
-  assert.equal(Logic.anchorHint("align", true, null), "请选择中文起始段。");
-  assert.equal(Logic.anchorHint("align", true, 2), "已选中文第 3 段，请再次点击中文段确定范围。");
+  assert.equal(Logic.anchorHint("align", false, null), "开启后点选连续译文段，再在右侧原文框点选对应原文段。");
+  assert.equal(Logic.anchorHint("align", true, null), "请选择译文起始段。");
+  assert.equal(Logic.anchorHint("align", true, 2), "已选译文第 3 段，请再次点击译文段确定范围。");
 });
 
 test("syncTargetIndex resolves english target using reverse map", () => {
@@ -77,8 +77,8 @@ test("englishIndicesForZh expands multi-paragraph english blocks", () => {
 });
 
 test("formatEnglishRangeLabel keeps single and range labels compact", () => {
-  assert.equal(Logic.formatEnglishRangeLabel({ start: 11, end: 12 }), "英文 12-13");
-  assert.equal(Logic.formatEnglishRangeLabel({ start: 4, end: 4 }), "英文 5");
+  assert.equal(Logic.formatEnglishRangeLabel({ start: 11, end: 12 }), "原文 12-13");
+  assert.equal(Logic.formatEnglishRangeLabel({ start: 4, end: 4 }), "原文 5");
 });
 
 test("englishContextWindow shows matched block with one neighbor on each side", () => {

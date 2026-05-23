@@ -1161,25 +1161,39 @@ select {
 
   body.mode-align .chapter-list,
   body.mode-read .chapter-list {
-    display: flex;
+    display: grid;
     gap: 8px;
-    max-height: none;
-    overflow-x: auto;
-    overflow-y: hidden;
-    padding-bottom: 4px;
-    scroll-snap-type: x proximity;
-    scrollbar-width: none;
+    max-height: min(38vh, 360px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding-right: 4px;
+    padding-bottom: 0;
+    scroll-snap-type: none;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(47, 94, 78, 0.45) rgba(47, 94, 78, 0.1);
     -webkit-overflow-scrolling: touch;
   }
 
   body.mode-align .chapter-list::-webkit-scrollbar,
   body.mode-read .chapter-list::-webkit-scrollbar {
-    display: none;
+    width: 10px;
+  }
+
+  body.mode-align .chapter-list::-webkit-scrollbar-track,
+  body.mode-read .chapter-list::-webkit-scrollbar-track {
+    background: rgba(47, 94, 78, 0.1);
+    border-radius: 999px;
+  }
+
+  body.mode-align .chapter-list::-webkit-scrollbar-thumb,
+  body.mode-read .chapter-list::-webkit-scrollbar-thumb {
+    background: rgba(47, 94, 78, 0.45);
+    border-radius: 999px;
   }
 
   body.mode-align .chapter-card,
   body.mode-read .chapter-card {
-    flex: 0 0 min(230px, 72vw);
+    width: 100%;
     scroll-snap-align: start;
   }
 
